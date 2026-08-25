@@ -6,6 +6,8 @@ import androidx.lifecycle.viewModelScope
 import com.example.medtrack.MedTrackApplication
 import com.example.medtrack.data.entity.BmiRecord
 import com.example.medtrack.data.entity.Patient
+import com.example.medtrack.data.entity.PendingLabOrder
+import com.example.medtrack.notification.ReminderScheduler
 import com.example.medtrack.util.LabComparisonHelper
 import com.example.medtrack.util.LabTestComparison
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -49,6 +51,17 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val pendingLabOrders: StateFlow<List<PendingLabOrder>> = patient
+        .flatMapLatest { p ->
+            if (p != null) db.pendingLabOrderDao().getPendingOrdersForPatient(p.id) else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val availableLabTestTypes: StateFlow<List<String>> = db.labTestTypeDao().getAllTestTypes()
+        .map { list -> list.map { it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     fun saveBmiRecord(weightKg: Double, heightCm: Double, bmi: Double, category: String) {
         val currentPatientId = patient.value?.id ?: 0
         viewModelScope.launch {
@@ -62,6 +75,49 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     calculatedAt = System.currentTimeMillis()
                 )
             )
+        }
+    }
+
+    fun savePendingLabOrder(
+        testName: String,
+        scheduledDate: String,
+        scheduledTime: String,
+        facilityName: String,
+        fastingInstructions: String,
+        notes: String,
+        isReminderEnabled: Boolean
+    ) {
+        val currentPatientId = patient.value?.id ?: return
+        viewModelScope.launch {
+            val order = PendingLabOrder(
+                patientId = currentPatientId,
+                testName = testName.trim(),
+                scheduledDate = scheduledDate.trim(),
+                scheduledTime = scheduledTime.trim(),
+                facilityName = facilityName.trim(),
+                fastingInstructions = fastingInstructions.trim(),
+                notes = notes.trim(),
+                isReminderEnabled = isReminderEnabled
+            )
+            val id = db.pendingLabOrderDao().insert(order).toInt()
+            val insertedOrder = order.copy(id = id)
+            if (isReminderEnabled) {
+                ReminderScheduler.scheduleLabOrderReminder(getApplication(), insertedOrder)
+            }
+        }
+    }
+
+    fun markLabOrderCompleted(order: PendingLabOrder) {
+        viewModelScope.launch {
+            db.pendingLabOrderDao().markAsCompleted(order.id)
+            ReminderScheduler.cancelLabOrderReminder(getApplication(), order.id)
+        }
+    }
+
+    fun deletePendingLabOrder(order: PendingLabOrder) {
+        viewModelScope.launch {
+            db.pendingLabOrderDao().delete(order)
+            ReminderScheduler.cancelLabOrderReminder(getApplication(), order.id)
         }
     }
 }

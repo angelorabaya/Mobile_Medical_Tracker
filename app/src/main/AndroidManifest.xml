@@ -42,6 +42,10 @@
             android:exported="false" />
 
         <receiver
+            android:name=".notification.LabOrderReminderReceiver"
+            android:exported="false" />
+
+        <receiver
             android:name=".notification.BootReceiver"
             android:exported="false">
             <intent-filter>

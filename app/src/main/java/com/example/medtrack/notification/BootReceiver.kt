@@ -26,6 +26,11 @@ class BootReceiver : BroadcastReceiver() {
                         context, reminder, label
                     )
                 }
+
+                val pendingLabOrders = db.pendingLabOrderDao().getAllActiveReminderOrders()
+                for (order in pendingLabOrders) {
+                    ReminderScheduler.scheduleLabOrderReminder(context, order)
+                }
             }
         }
     }

@@ -1,5 +1,7 @@
 package com.example.medtrack.ui.home
 
+import android.app.DatePickerDialog
+import android.app.TimePickerDialog
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -23,6 +25,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -32,6 +35,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.medtrack.data.entity.BmiRecord
 import com.example.medtrack.data.entity.Patient
+import com.example.medtrack.data.entity.PendingLabOrder
 import com.example.medtrack.theme.*
 import com.example.medtrack.ui.components.CategoryBadge
 import com.example.medtrack.util.AsianBmiCalculator
@@ -39,8 +43,10 @@ import com.example.medtrack.util.AsianBmiCategory
 import com.example.medtrack.util.ComparisonTrend
 import com.example.medtrack.util.LabResultEvaluator
 import com.example.medtrack.util.LabTestComparison
+import com.example.medtrack.util.PendingLabOrderHelper
 import java.io.File
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
@@ -60,6 +66,8 @@ fun HomeScreen(
     val activePrescriptionCount by viewModel.activePrescriptionCount.collectAsStateWithLifecycle()
     val comparativeLabPanels by viewModel.comparativeLabPanels.collectAsStateWithLifecycle()
     val latestBmiRecord by viewModel.latestBmiRecord.collectAsStateWithLifecycle()
+    val pendingLabOrders by viewModel.pendingLabOrders.collectAsStateWithLifecycle()
+    val availableLabTestTypes by viewModel.availableLabTestTypes.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -176,6 +184,21 @@ fun HomeScreen(
 
                 // Full width Reminders action card
                 RemindersBannerCard(onClick = onNavigateToReminders)
+
+                // Pending Lab Order Card (Upcoming schedules & 1-day alerts)
+                PendingLabOrderCard(
+                    orders = pendingLabOrders,
+                    availableTestTypes = availableLabTestTypes,
+                    onSaveOrder = { testName, date, time, facility, prep, notes, reminder ->
+                        viewModel.savePendingLabOrder(testName, date, time, facility, prep, notes, reminder)
+                    },
+                    onCompleteOrder = { order ->
+                        viewModel.markLabOrderCompleted(order)
+                    },
+                    onDeleteOrder = { order ->
+                        viewModel.deletePendingLabOrder(order)
+                    }
+                )
 
                 // Asian Body Mass Index (BMI) Calculator
                 AsianBmiCalculatorCard(
@@ -1834,4 +1857,691 @@ private fun AsianBmiSpectrumBar(currentBmi: Double) {
             Text("≥ 30.0", style = MaterialTheme.typography.labelSmall, color = Color(0xFFC62828))
         }
     }
+}
+
+@Composable
+fun PendingLabOrderCard(
+    orders: List<PendingLabOrder>,
+    availableTestTypes: List<String>,
+    onSaveOrder: (String, String, String, String, String, String, Boolean) -> Unit,
+    onCompleteOrder: (PendingLabOrder) -> Unit,
+    onDeleteOrder: (PendingLabOrder) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isExpanded by remember { mutableStateOf(true) }
+    var showScheduleDialog by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.EventNote,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.tertiary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(
+                                "Pending Lab Order",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            if (orders.isNotEmpty()) {
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer
+                                ) {
+                                    Text(
+                                        "${orders.size}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        Text(
+                            if (orders.isNotEmpty()) "Upcoming test schedules & 1-day alerts" else "Schedule next tests with 1-day reminder",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    IconButton(
+                        onClick = { showScheduleDialog = true },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.AddCircle,
+                            contentDescription = "Add Lab Order",
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = { isExpanded = !isExpanded },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.padding(top = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (orders.isEmpty()) {
+                        // Empty state
+                        Surface(
+                            shape = RoundedCornerShape(14.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(18.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.CalendarMonth,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                    modifier = Modifier.size(36.dp)
+                                )
+                                Text(
+                                    "No Scheduled Lab Orders",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    "Input your next scheduled lab test (e.g. FBS, Lipid Profile, HbA1c). VitalsIQ will automatically alarm you 1 day before the scheduled test so you're ready with fasting or preparations.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Button(
+                                    onClick = { showScheduleDialog = true },
+                                    shape = RoundedCornerShape(10.dp),
+                                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(6.dp))
+                                    Text("Schedule Next Lab Test", fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    } else {
+                        // Orders list
+                        orders.forEach { order ->
+                            PendingLabOrderItemCard(
+                                order = order,
+                                onComplete = { onCompleteOrder(order) },
+                                onDelete = { onDeleteOrder(order) }
+                            )
+                        }
+
+                        OutlinedButton(
+                            onClick = { showScheduleDialog = true },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Schedule Another Lab Test", fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if (showScheduleDialog) {
+        ScheduleLabOrderDialog(
+            availableTestTypes = availableTestTypes,
+            onDismiss = { showScheduleDialog = false },
+            onSave = { testName, date, time, facility, prep, notes, reminder ->
+                onSaveOrder(testName, date, time, facility, prep, notes, reminder)
+                showScheduleDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun PendingLabOrderItemCard(
+    order: PendingLabOrder,
+    onComplete: () -> Unit,
+    onDelete: () -> Unit
+) {
+    val countdown = remember(order.scheduledDate) {
+        PendingLabOrderHelper.getCountdownStatus(order.scheduledDate)
+    }
+    val displayDate = remember(order.scheduledDate) {
+        PendingLabOrderHelper.formatDisplayDate(order.scheduledDate)
+    }
+    val displayTime = remember(order.scheduledTime) {
+        PendingLabOrderHelper.formatDisplayTime(order.scheduledTime)
+    }
+    val alarmInfo = remember(order.scheduledDate, order.scheduledTime) {
+        PendingLabOrderHelper.getAlarmInfoText(order.scheduledDate, order.scheduledTime)
+    }
+
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Top Row: Test Title & Countdown Chip
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    order.testName,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = countdown.second.copy(alpha = 0.15f)
+                ) {
+                    Text(
+                        countdown.first,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = countdown.second,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+
+            // Schedule Date & Time Row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Icon(
+                    Icons.Default.CalendarToday,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(15.dp)
+                )
+                Text(
+                    "$displayDate • $displayTime",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+
+            // Facility / Lab Name
+            if (order.facilityName.isNotBlank()) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.LocalHospital,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Text(
+                        order.facilityName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            // Fasting / Prep Note
+            if (order.fastingInstructions.isNotBlank()) {
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = Color(0xFFFFF8E1),
+                    border = BorderStroke(1.dp, Color(0xFFFFE082)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.FreeBreakfast,
+                            contentDescription = null,
+                            tint = Color(0xFFF57F17),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Text(
+                            order.fastingInstructions,
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFFE65100)
+                        )
+                    }
+                }
+            }
+
+            // Notes if any
+            if (order.notes.isNotBlank()) {
+                Text(
+                    "Note: ${order.notes}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
+            // 1-Day Alarm Badge
+            if (order.isReminderEnabled) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Alarm,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        "1-Day Prior Alarm: $alarmInfo",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            HorizontalDivider(
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                modifier = Modifier.padding(vertical = 2.dp)
+            )
+
+            // Actions Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedButton(
+                    onClick = onComplete,
+                    shape = RoundedCornerShape(8.dp),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
+                    modifier = Modifier.height(34.dp)
+                ) {
+                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text("Mark Completed", style = MaterialTheme.typography.labelMedium)
+                }
+
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        Icons.Default.DeleteOutline,
+                        contentDescription = "Delete",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ScheduleLabOrderDialog(
+    availableTestTypes: List<String>,
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, String, String, String, Boolean) -> Unit
+) {
+    val context = LocalContext.current
+    val calendar = Calendar.getInstance().apply {
+        add(Calendar.DAY_OF_YEAR, 1)
+    }
+
+    val defaultDate = remember {
+        SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
+    }
+
+    var testName by remember { mutableStateOf("") }
+    var scheduledDate by remember { mutableStateOf(defaultDate) }
+    var scheduledTime by remember { mutableStateOf("07:30") }
+    var facilityName by remember { mutableStateOf("") }
+    var fastingInstructions by remember { mutableStateOf("10-12 hours fasting required (water only)") }
+    var notes by remember { mutableStateOf("") }
+    var isReminderEnabled by remember { mutableStateOf(true) }
+
+    val commonSuggestions = listOf(
+        "Fasting Blood Sugar (FBS)",
+        "Lipid Profile (Cholesterol/Triglycerides)",
+        "HbA1c (Glycated Hemoglobin)",
+        "Complete Blood Count (CBC)",
+        "Liver Function (SGPT / ALT)",
+        "Kidney Function (Creatinine / BUN)",
+        "Uric Acid (Serum)",
+        "Thyroid Panel (TSH / FT4)",
+        "Routine Urinalysis"
+    )
+
+    val allSuggestions = remember(availableTestTypes) {
+        val list = mutableListOf<String>()
+        list.addAll(commonSuggestions)
+        availableTestTypes.forEach { type ->
+            if (!list.contains(type)) list.add(type)
+        }
+        list
+    }
+
+    val commonPrepOptions = listOf(
+        "10-12 hrs Fasting (Water only)",
+        "8 hrs Fasting (Water only)",
+        "No Morning Meds",
+        "Water Allowed Only",
+        "No Special Prep"
+    )
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Default.AddAlert,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Text("Schedule Pending Lab Order", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Text(
+                    "Set your next lab test date & time. You will be alarmed 1 day before the scheduled test.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                // Test Name
+                OutlinedTextField(
+                    value = testName,
+                    onValueChange = { testName = it },
+                    label = { Text("Lab Test / Procedure Name *") },
+                    placeholder = { Text("e.g. Fasting Blood Sugar, Lipid Panel") },
+                    leadingIcon = { Icon(Icons.Default.Biotech, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Quick suggestions chips
+                Text(
+                    "Quick Suggestions:",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    allSuggestions.forEach { suggestion ->
+                        SuggestionChip(
+                            onClick = { testName = suggestion },
+                            label = { Text(suggestion, style = MaterialTheme.typography.labelSmall) },
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+                }
+
+                // Date and Time Pickers
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    OutlinedCard(
+                        onClick = {
+                            val dateParts = scheduledDate.split("-")
+                            val y = dateParts.getOrNull(0)?.toIntOrNull() ?: calendar.get(Calendar.YEAR)
+                            val m = (dateParts.getOrNull(1)?.toIntOrNull() ?: (calendar.get(Calendar.MONTH) + 1)) - 1
+                            val d = dateParts.getOrNull(2)?.toIntOrNull() ?: calendar.get(Calendar.DAY_OF_MONTH)
+
+                            val datePicker = DatePickerDialog(
+                                context,
+                                { _, selectedYear, selectedMonth, selectedDay ->
+                                    scheduledDate = String.format(Locale.US, "%04d-%02d-%02d", selectedYear, selectedMonth + 1, selectedDay)
+                                },
+                                y, m, d
+                            )
+                            datePicker.show()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Column {
+                                Text("Date", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(scheduledDate, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+
+                    OutlinedCard(
+                        onClick = {
+                            val timeParts = scheduledTime.split(":")
+                            val h = timeParts.getOrNull(0)?.toIntOrNull() ?: 7
+                            val min = timeParts.getOrNull(1)?.toIntOrNull() ?: 30
+
+                            val timePicker = TimePickerDialog(
+                                context,
+                                { _, selectedHour, selectedMinute ->
+                                    scheduledTime = String.format(Locale.US, "%02d:%02d", selectedHour, selectedMinute)
+                                },
+                                h, min, false
+                            )
+                            timePicker.show()
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                            Column {
+                                Text("Time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(PendingLabOrderHelper.formatDisplayTime(scheduledTime), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                // Facility
+                OutlinedTextField(
+                    value = facilityName,
+                    onValueChange = { facilityName = it },
+                    label = { Text("Laboratory / Clinic (Optional)") },
+                    placeholder = { Text("e.g. St. Luke's, Hi-Precision") },
+                    leadingIcon = { Icon(Icons.Default.LocalHospital, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Fasting / Prep Instructions
+                OutlinedTextField(
+                    value = fastingInstructions,
+                    onValueChange = { fastingInstructions = it },
+                    label = { Text("Fasting & Preparation Note") },
+                    placeholder = { Text("e.g. 10-12 hours fasting, water only") },
+                    leadingIcon = { Icon(Icons.Default.FreeBreakfast, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                // Quick Prep Chips
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    commonPrepOptions.forEach { option ->
+                        FilterChip(
+                            selected = fastingInstructions == option,
+                            onClick = { fastingInstructions = option },
+                            label = { Text(option, style = MaterialTheme.typography.labelSmall) },
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                    }
+                }
+
+                // Notes
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Additional Notes (Optional)") },
+                    placeholder = { Text("e.g. Bring doctor's referral letter") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    minLines = 2
+                )
+
+                // 1-Day Prior Alarm Switch
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.NotificationsActive, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                            Column {
+                                Text("Alarm 1 Day Before", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                Text("Alerts you 24 hrs prior to fast/prepare", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                        Switch(
+                            checked = isReminderEnabled,
+                            onCheckedChange = { isReminderEnabled = it }
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (testName.isNotBlank() && scheduledDate.isNotBlank()) {
+                        onSave(testName, scheduledDate, scheduledTime, facilityName, fastingInstructions, notes, isReminderEnabled)
+                    }
+                },
+                enabled = testName.isNotBlank() && scheduledDate.isNotBlank(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Schedule & Set Alarm", fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            OutlinedButton(
+                onClick = onDismiss,
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Cancel")
+            }
+        },
+        shape = RoundedCornerShape(20.dp)
+    )
 }

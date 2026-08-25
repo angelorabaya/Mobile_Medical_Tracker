@@ -79,19 +79,30 @@ class MedTrackApplication : Application() {
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
+            val manager = getSystemService(NotificationManager::class.java)
+
+            val medicineChannel = NotificationChannel(
                 REMINDER_CHANNEL_ID,
                 "Medicine Reminders",
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
                 description = "Reminders to take your medicine"
             }
-            val manager = getSystemService(NotificationManager::class.java)
-            manager.createNotificationChannel(channel)
+            manager.createNotificationChannel(medicineChannel)
+
+            val labOrderChannel = NotificationChannel(
+                LAB_ORDER_CHANNEL_ID,
+                "Lab Test Reminders",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Alerts for upcoming scheduled laboratory tests (1 day before)"
+            }
+            manager.createNotificationChannel(labOrderChannel)
         }
     }
 
     companion object {
         const val REMINDER_CHANNEL_ID = "medicine_reminders"
+        const val LAB_ORDER_CHANNEL_ID = "lab_order_reminders"
     }
 }
