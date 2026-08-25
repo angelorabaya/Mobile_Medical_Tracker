@@ -1322,42 +1322,32 @@ fun AsianBmiCalculatorCard(
                 Row(
                     modifier = Modifier.weight(1f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Surface(
-                        shape = RoundedCornerShape(12.dp),
+                        shape = RoundedCornerShape(10.dp),
                         color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(38.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 Icons.Default.Calculate,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(22.dp)
                             )
                         }
                     }
-                    Column {
-                        Text(
-                            "Asian BMI Calculator",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Text(
-                            "WHO Asian Population Standard",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    if (!isExpanded && calculatedBmi != null && calculatedCategory != null) {
+                    Text(
+                        "Asian BMI",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1
+                    )
+
+                    if (calculatedBmi != null && calculatedCategory != null) {
                         Surface(
                             shape = RoundedCornerShape(8.dp),
                             color = calculatedCategory!!.containerColor
@@ -1367,16 +1357,36 @@ fun AsianBmiCalculatorCard(
                                 style = MaterialTheme.typography.labelSmall,
                                 fontWeight = FontWeight.Bold,
                                 color = calculatedCategory!!.textColor,
-                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                                maxLines = 1
                             )
                         }
                     }
-                    IconButton(onClick = { isExpanded = !isExpanded }) {
-                        Icon(
-                            if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                            contentDescription = if (isExpanded) "Collapse" else "Expand"
+
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant
+                    ) {
+                        Text(
+                            "WHO Asian",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                            maxLines = 1
                         )
                     }
+                }
+
+                IconButton(
+                    onClick = { isExpanded = !isExpanded },
+                    modifier = Modifier.size(36.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = if (isExpanded) "Collapse" else "Expand",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
