@@ -565,7 +565,7 @@ private fun ComparativeLabPanelReviewCard(
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var selectedFilter by remember { mutableStateOf("All") }
-    var isExpanded by remember { mutableStateOf(true) }
+    var isExpanded by remember { mutableStateOf(false) }
 
     val elevatedCount = remember(comparisons) { comparisons.count { it.trend == ComparisonTrend.ELEVATED } }
     val decreasedCount = remember(comparisons) { comparisons.count { it.trend == ComparisonTrend.DECREASED } }
@@ -639,9 +639,12 @@ private fun ComparativeLabPanelReviewCard(
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            "Recent vs Previous Findings & Trends",
+                            if (!isExpanded && comparisons.isNotEmpty()) {
+                                if (elevatedCount > 0) "$elevatedCount Elevated • ${comparisons.size} Tests Analyzed (Tap to expand)"
+                                else "${comparisons.size} Tests Analyzed (Tap to expand)"
+                            } else "Recent vs Previous Findings & Trends",
                             style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = if (!isExpanded && elevatedCount > 0) Color(0xFFD32F2F) else MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
                 }
