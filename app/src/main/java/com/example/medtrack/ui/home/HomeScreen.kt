@@ -843,45 +843,48 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                 .padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            // Test Name, Category & Trend Badge
-            Row(
+            // Test Name (Top) followed by Category Badge and Trend Badge on the exact same horizontal line
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        item.testName,
-                        style = MaterialTheme.typography.titleSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Spacer(Modifier.height(2.dp))
-                    CategoryBadge(category = item.category)
-                }
+                Text(
+                    item.testName,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
 
-                // Trend badge
-                Surface(
-                    shape = RoundedCornerShape(8.dp),
-                    color = trendBg
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    CategoryBadge(category = item.category)
+
+                    // Trend badge (e.g. "Baseline (1st)", "▲ Elevated", "▼ Decreased", "— Stable")
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = trendBg
                     ) {
-                        Icon(
-                            trendIcon,
-                            contentDescription = null,
-                            tint = trendColor,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Text(
-                            text = trendLabel,
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
-                            color = trendColor
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                trendIcon,
+                                contentDescription = null,
+                                tint = trendColor,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Text(
+                                text = trendLabel,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = trendColor
+                            )
+                        }
                     }
                 }
             }
@@ -913,22 +916,28 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                 }
             }
 
-            // Side-by-Side Comparison: Recent vs Previous
+            // Side-by-Side Comparison: Recent vs Previous (Equal intrinsic height & balanced alignments)
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Recent Box
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
                                 "Recent",
                                 style = MaterialTheme.typography.labelSmall,
@@ -945,20 +954,24 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                             )
                         }
 
-                        Text(
-                            item.recentResult,
-                            style = MaterialTheme.typography.bodyMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = recentColors.textColor
-                        )
+                        Spacer(Modifier.height(4.dp))
 
-                        if (recentColors.badgeText != null) {
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                             Text(
-                                recentColors.badgeText,
-                                style = MaterialTheme.typography.labelSmall,
-                                color = recentColors.badgeColor,
-                                fontWeight = FontWeight.Bold
+                                item.recentResult,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = recentColors.textColor
                             )
+
+                            if (recentColors.badgeText != null) {
+                                Text(
+                                    recentColors.badgeText,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = recentColors.badgeColor,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
@@ -967,14 +980,18 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                 Surface(
                     shape = RoundedCornerShape(10.dp),
                     color = MaterialTheme.colorScheme.surface,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
                 ) {
                     Column(
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(horizontal = 10.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
                     ) {
                         if (item.previousResult != null) {
-                            Column {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(
                                     "Previous",
                                     style = MaterialTheme.typography.labelSmall,
@@ -991,23 +1008,27 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                                 )
                             }
 
-                            Text(
-                                item.previousResult,
-                                style = MaterialTheme.typography.bodyMedium,
-                                fontWeight = FontWeight.Bold,
-                                color = prevColors?.textColor ?: MaterialTheme.colorScheme.onSurface
-                            )
+                            Spacer(Modifier.height(4.dp))
 
-                            if (prevColors?.badgeText != null) {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(
-                                    prevColors.badgeText,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = prevColors.badgeColor,
-                                    fontWeight = FontWeight.Bold
+                                    item.previousResult,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = prevColors?.textColor ?: MaterialTheme.colorScheme.onSurface
                                 )
+
+                                if (prevColors?.badgeText != null) {
+                                    Text(
+                                        prevColors.badgeText,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = prevColors.badgeColor,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
                         } else {
-                            Column {
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                                 Text(
                                     "Previous",
                                     style = MaterialTheme.typography.labelSmall,
@@ -1021,18 +1042,22 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                                 )
                             }
 
-                            Text(
-                                "Baseline entry",
-                                style = MaterialTheme.typography.bodySmall,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            Spacer(Modifier.height(4.dp))
 
-                            Text(
-                                "No prior test",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            )
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Text(
+                                    "No prior record",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    "Initial baseline",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                         }
                     }
                 }
