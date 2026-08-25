@@ -15,9 +15,10 @@ import com.example.medtrack.data.entity.*
         Prescription::class,
         PrescriptionMedication::class,
         MedicineReminder::class,
-        LabTestType::class
+        LabTestType::class,
+        BmiRecord::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class MedTrackDatabase : RoomDatabase() {
@@ -26,6 +27,7 @@ abstract class MedTrackDatabase : RoomDatabase() {
     abstract fun prescriptionDao(): PrescriptionDao
     abstract fun medicineReminderDao(): MedicineReminderDao
     abstract fun labTestTypeDao(): LabTestTypeDao
+    abstract fun bmiRecordDao(): BmiRecordDao
 
     companion object {
         @Volatile

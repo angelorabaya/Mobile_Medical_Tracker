@@ -1,6 +1,7 @@
 package com.example.medtrack.ui.home
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -8,6 +9,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
@@ -22,18 +24,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.medtrack.data.entity.BmiRecord
 import com.example.medtrack.data.entity.Patient
 import com.example.medtrack.theme.*
-import java.io.File
 import com.example.medtrack.ui.components.CategoryBadge
+import com.example.medtrack.util.AsianBmiCalculator
+import com.example.medtrack.util.AsianBmiCategory
 import com.example.medtrack.util.ComparisonTrend
 import com.example.medtrack.util.LabResultEvaluator
 import com.example.medtrack.util.LabTestComparison
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -50,6 +59,7 @@ fun HomeScreen(
     val labTestCount by viewModel.labTestCount.collectAsStateWithLifecycle()
     val activePrescriptionCount by viewModel.activePrescriptionCount.collectAsStateWithLifecycle()
     val comparativeLabPanels by viewModel.comparativeLabPanels.collectAsStateWithLifecycle()
+    val latestBmiRecord by viewModel.latestBmiRecord.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -166,6 +176,14 @@ fun HomeScreen(
 
                 // Full width Reminders action card
                 RemindersBannerCard(onClick = onNavigateToReminders)
+
+                // Asian Body Mass Index (BMI) Calculator
+                AsianBmiCalculatorCard(
+                    latestRecord = latestBmiRecord,
+                    onSaveRecord = { weight, height, bmi, category ->
+                        viewModel.saveBmiRecord(weight, height, bmi, category)
+                    }
+                )
 
                 // Comparative Lab Panel Review
                 ComparativeLabPanelReviewCard(
@@ -1243,3 +1261,513 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
 }
 
 private data class ComparativeQuadruple<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
+
+@Composable
+fun AsianBmiCalculatorCard(
+    latestRecord: BmiRecord?,
+    onSaveRecord: (Double, Double, Double, String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var isExpanded by remember { mutableStateOf(false) }
+    var weightInput by remember { mutableStateOf("") }
+    var heightInput by remember { mutableStateOf("") }
+    var calculatedBmi by remember { mutableStateOf<Double?>(null) }
+    var calculatedCategory by remember { mutableStateOf<AsianBmiCategory?>(null) }
+    var showSavedNotification by remember { mutableStateOf(false) }
+
+    // Synchronize inputs with latest record when loaded
+    LaunchedEffect(latestRecord) {
+        if (latestRecord != null && weightInput.isEmpty() && heightInput.isEmpty()) {
+            weightInput = AsianBmiCalculator.formatWeight(latestRecord.weightKg)
+            heightInput = AsianBmiCalculator.formatHeight(latestRecord.heightCm)
+            calculatedBmi = latestRecord.bmi
+            calculatedCategory = AsianBmiCategory.fromBmi(latestRecord.bmi)
+        }
+    }
+
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            // Header Row
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isExpanded = !isExpanded },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                Icons.Default.Calculate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            "Asian BMI Calculator",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            "WHO Asian Population Standard",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (!isExpanded && calculatedBmi != null && calculatedCategory != null) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = calculatedCategory!!.containerColor
+                        ) {
+                            Text(
+                                "${AsianBmiCalculator.formatBmi(calculatedBmi!!)} • ${calculatedCategory!!.label}",
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = calculatedCategory!!.textColor,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                    IconButton(onClick = { isExpanded = !isExpanded }) {
+                        Icon(
+                            if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                            contentDescription = if (isExpanded) "Collapse" else "Expand"
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = isExpanded) {
+                Column(
+                    modifier = Modifier.padding(top = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    // Input Row (Weight & Height)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = weightInput,
+                            onValueChange = { input ->
+                                if (input.isEmpty() || input.matches(Regex("""^\d*\.?\d*$"""))) {
+                                    weightInput = input
+                                    showSavedNotification = false
+                                    val w = input.toDoubleOrNull()
+                                    val h = heightInput.toDoubleOrNull()
+                                    if (w != null && h != null && w > 0 && h > 0) {
+                                        val bmi = AsianBmiCalculator.calculateBmi(w, h)
+                                        if (bmi != null) {
+                                            calculatedBmi = bmi
+                                            calculatedCategory = AsianBmiCategory.fromBmi(bmi)
+                                        }
+                                    }
+                                }
+                            },
+                            label = { Text("Weight (kg)") },
+                            placeholder = { Text("e.g. 65") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        )
+
+                        OutlinedTextField(
+                            value = heightInput,
+                            onValueChange = { input ->
+                                if (input.isEmpty() || input.matches(Regex("""^\d*\.?\d*$"""))) {
+                                    heightInput = input
+                                    showSavedNotification = false
+                                    val w = weightInput.toDoubleOrNull()
+                                    val h = input.toDoubleOrNull()
+                                    if (w != null && h != null && w > 0 && h > 0) {
+                                        val bmi = AsianBmiCalculator.calculateBmi(w, h)
+                                        if (bmi != null) {
+                                            calculatedBmi = bmi
+                                            calculatedCategory = AsianBmiCategory.fromBmi(bmi)
+                                        }
+                                    }
+                                }
+                            },
+                            label = { Text("Height (cm)") },
+                            placeholder = { Text("e.g. 170") },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+
+                    // Action buttons (Calculate & Save / Clear)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val w = weightInput.toDoubleOrNull()
+                                val h = heightInput.toDoubleOrNull()
+                                if (w != null && h != null && w > 0 && h > 0) {
+                                    val bmi = AsianBmiCalculator.calculateBmi(w, h)
+                                    if (bmi != null) {
+                                        val cat = AsianBmiCategory.fromBmi(bmi)
+                                        calculatedBmi = bmi
+                                        calculatedCategory = cat
+                                        onSaveRecord(w, h, bmi, cat.label)
+                                        showSavedNotification = true
+                                    }
+                                }
+                            },
+                            enabled = weightInput.toDoubleOrNull() != null && heightInput.toDoubleOrNull() != null,
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Calculate & Record", fontWeight = FontWeight.Bold)
+                        }
+
+                        if (weightInput.isNotEmpty() || heightInput.isNotEmpty()) {
+                            OutlinedButton(
+                                onClick = {
+                                    weightInput = ""
+                                    heightInput = ""
+                                    calculatedBmi = null
+                                    calculatedCategory = null
+                                    showSavedNotification = false
+                                },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Clear")
+                            }
+                        }
+                    }
+
+                    if (showSavedNotification) {
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = PrimaryContainerLight,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.CheckCircle,
+                                    contentDescription = null,
+                                    tint = PrimaryTeal,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    "Recorded latest measurements successfully!",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = PrimaryTealDark,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+
+                    // Outcomes Section
+                    if (calculatedBmi != null && calculatedCategory != null) {
+                        val category = calculatedCategory!!
+                        val bmi = calculatedBmi!!
+                        val heightVal = heightInput.toDoubleOrNull() ?: latestRecord?.heightCm
+
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = category.containerColor,
+                            border = BorderStroke(1.dp, category.primaryColor.copy(alpha = 0.4f)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                // Result Header Row
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column {
+                                        Text(
+                                            "Calculated Asian BMI",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.Bottom,
+                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Text(
+                                                AsianBmiCalculator.formatBmi(bmi),
+                                                style = MaterialTheme.typography.headlineLarge,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = category.textColor
+                                            )
+                                            Text(
+                                                "kg/m²",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                modifier = Modifier.padding(bottom = 4.dp)
+                                            )
+                                        }
+                                    }
+
+                                    Surface(
+                                        shape = RoundedCornerShape(10.dp),
+                                        color = category.primaryColor,
+                                        shadowElevation = 2.dp
+                                    ) {
+                                        Text(
+                                            category.label,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White,
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(color = category.primaryColor.copy(alpha = 0.2f))
+
+                                // Asian BMI 5-Zone Spectrum Bar
+                                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    Text(
+                                        "Asian Classification Spectrum",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    AsianBmiSpectrumBar(currentBmi = bmi)
+                                }
+
+                                // Healthy Weight Target info
+                                if (heightVal != null && heightVal > 0) {
+                                    val range = AsianBmiCalculator.getHealthyWeightRange(heightVal)
+                                    if (range != null) {
+                                        Surface(
+                                            shape = RoundedCornerShape(10.dp),
+                                            color = Color.White.copy(alpha = 0.7f),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier.padding(10.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                            ) {
+                                                Icon(
+                                                    Icons.Default.Info,
+                                                    contentDescription = null,
+                                                    tint = category.primaryColor,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                                Column {
+                                                    Text(
+                                                        "Healthy Weight for ${AsianBmiCalculator.formatHeight(heightVal)} cm (Asian Std):",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = MaterialTheme.colorScheme.onSurface
+                                                    )
+                                                    Text(
+                                                        "${AsianBmiCalculator.formatWeight(range.first)} kg – ${AsianBmiCalculator.formatWeight(range.second)} kg",
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        fontWeight = FontWeight.ExtraBold,
+                                                        color = Color(0xFF2E7D32)
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Clinical Insight Box
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.Top,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.HealthAndSafety,
+                                        contentDescription = null,
+                                        tint = category.primaryColor,
+                                        modifier = Modifier.size(18.dp).padding(top = 2.dp)
+                                    )
+                                    Text(
+                                        category.healthRisk,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = category.textColor,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+
+                                // Last recorded timestamp if available
+                                if (latestRecord != null) {
+                                    val dateStr = remember(latestRecord.calculatedAt) {
+                                        SimpleDateFormat("MMM dd, yyyy • hh:mm a", Locale.getDefault())
+                                            .format(Date(latestRecord.calculatedAt))
+                                    }
+                                    Text(
+                                        "Last recorded: $dateStr (${AsianBmiCalculator.formatWeight(latestRecord.weightKg)} kg, ${AsianBmiCalculator.formatHeight(latestRecord.heightCm)} cm)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Expandable Asian BMI Cutoff Reference Table
+                    var showReferenceTable by remember { mutableStateOf(false) }
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showReferenceTable = !showReferenceTable },
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Analytics,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        "WHO Asian BMI Criteria Reference",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                Icon(
+                                    if (showReferenceTable) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            AnimatedVisibility(visible = showReferenceTable) {
+                                Column(
+                                    modifier = Modifier.padding(top = 10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        "Asian populations generally exhibit higher body fat percentages and cardiovascular risks at lower BMI thresholds compared to Western standards.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+
+                                    AsianBmiCategory.entries.forEach { cat ->
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = cat.containerColor,
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                                                horizontalArrangement = Arrangement.SpaceBetween,
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Text(
+                                                    cat.label,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = cat.textColor
+                                                )
+                                                Text(
+                                                    cat.rangeDescription,
+                                                    style = MaterialTheme.typography.labelSmall,
+                                                    fontWeight = FontWeight.ExtraBold,
+                                                    color = cat.textColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AsianBmiSpectrumBar(currentBmi: Double) {
+    val categories = AsianBmiCategory.entries
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Multi-segment colored bar
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(14.dp)
+                .clip(RoundedCornerShape(7.dp))
+        ) {
+            categories.forEach { cat ->
+                Box(
+                    modifier = Modifier
+                        .weight(if (cat == AsianBmiCategory.NORMAL || cat == AsianBmiCategory.OBESE_CLASS_1) 1.2f else 1f)
+                        .fillMaxHeight()
+                        .background(cat.primaryColor)
+                )
+            }
+        }
+
+        // Zone threshold labels
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text("< 18.5", style = MaterialTheme.typography.labelSmall, color = Color(0xFF0288D1))
+            Text("18.5", style = MaterialTheme.typography.labelSmall, color = Color(0xFF2E7D32))
+            Text("23.0", style = MaterialTheme.typography.labelSmall, color = Color(0xFFF57F17))
+            Text("25.0", style = MaterialTheme.typography.labelSmall, color = Color(0xFFE65100))
+            Text("≥ 30.0", style = MaterialTheme.typography.labelSmall, color = Color(0xFFC62828))
+        }
+    }
+}

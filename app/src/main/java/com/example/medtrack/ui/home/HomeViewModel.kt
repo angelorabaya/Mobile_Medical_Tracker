@@ -4,11 +4,13 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.medtrack.MedTrackApplication
+import com.example.medtrack.data.entity.BmiRecord
 import com.example.medtrack.data.entity.Patient
 import com.example.medtrack.util.LabComparisonHelper
 import com.example.medtrack.util.LabTestComparison
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
     private val db = (application as MedTrackApplication).database
@@ -39,4 +41,27 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             LabComparisonHelper.generateComparativePanels(testsWithItems)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val latestBmiRecord: StateFlow<BmiRecord?> = patient
+        .flatMapLatest { p ->
+            if (p != null) db.bmiRecordDao().getLatestBmiRecordForPatient(p.id) else flowOf(null)
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
+
+    fun saveBmiRecord(weightKg: Double, heightCm: Double, bmi: Double, category: String) {
+        val currentPatientId = patient.value?.id ?: 0
+        viewModelScope.launch {
+            db.bmiRecordDao().insert(
+                BmiRecord(
+                    patientId = currentPatientId,
+                    weightKg = weightKg,
+                    heightCm = heightCm,
+                    bmi = bmi,
+                    category = category,
+                    calculatedAt = System.currentTimeMillis()
+                )
+            )
+        }
+    }
 }
