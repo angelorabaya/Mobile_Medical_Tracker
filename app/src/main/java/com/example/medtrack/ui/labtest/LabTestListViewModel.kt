@@ -1,0 +1,29 @@
+package com.example.medtrack.ui.labtest
+
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.medtrack.MedTrackApplication
+import com.example.medtrack.data.entity.LabTest
+import com.example.medtrack.data.entity.LabTestWithItems
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.launch
+
+class LabTestListViewModel(application: Application) : AndroidViewModel(application) {
+    private val db = (application as MedTrackApplication).database
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val labTestsWithItems: StateFlow<List<LabTestWithItems>> = db.patientDao().getPatient()
+        .flatMapLatest { patient ->
+            if (patient != null) db.labTestDao().getLabTestsWithItems(patient.id)
+            else flowOf(emptyList())
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun deleteLabTest(labTest: LabTest) {
+        viewModelScope.launch {
+            db.labTestDao().delete(labTest)
+        }
+    }
+}
