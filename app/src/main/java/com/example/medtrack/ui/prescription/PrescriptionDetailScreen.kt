@@ -516,144 +516,19 @@ fun PrescriptionDetailScreen(
 
     // Modal: Edit Medication Dialog
     if (editingMedication != null) {
-        val med = editingMedication!!
-        var medName by remember(med) { mutableStateOf(med.medicationName) }
-        var dosage by remember(med) { mutableStateOf(med.dosage) }
-        val (initM, initN, initE) = remember(med) { FrequencyHelper.parseSchedule(med.frequency) }
-        var morning by remember(med) { mutableStateOf(initM) }
-        var noon by remember(med) { mutableStateOf(initN) }
-        var night by remember(med) { mutableStateOf(initE) }
-        var duration by remember(med) { mutableStateOf(med.duration) }
-        var instructions by remember(med) { mutableStateOf(med.instructions) }
-        var showDeleteConfirm by remember { mutableStateOf(false) }
-
-        AlertDialog(
-            onDismissRequest = { editingMedication = null },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Modify Medication", fontWeight = FontWeight.Bold)
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = medName,
-                        onValueChange = { medName = it },
-                        label = { Text("Medication Name *") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = dosage,
-                            onValueChange = { dosage = it },
-                            label = { Text("Dosage") },
-                            placeholder = { Text("e.g. 500mg") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        OutlinedTextField(
-                            value = duration,
-                            onValueChange = { duration = it },
-                            label = { Text("Duration") },
-                            placeholder = { Text("e.g. 7 days") },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                    }
-
-                    // 3-box Dosage Schedule (Morning - Noon - Night)
-                    DosageScheduleInput(
-                        morning = morning,
-                        noon = noon,
-                        night = night,
-                        onMorningChange = { morning = it },
-                        onNoonChange = { noon = it },
-                        onNightChange = { night = it }
-                    )
-
-                    OutlinedTextField(
-                        value = instructions,
-                        onValueChange = { instructions = it },
-                        label = { Text("Special Instructions") },
-                        placeholder = { Text("e.g. Take with full glass of water") },
-                        minLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    if ((prescriptionWithMeds?.medications?.size ?: 0) > 1) {
-                        TextButton(
-                            onClick = { showDeleteConfirm = true },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Delete this medication")
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (medName.isNotBlank()) {
-                            val formattedFreq = FrequencyHelper.formatSchedule(morning, noon, night)
-                            viewModel.updateMedication(
-                                med.copy(
-                                    medicationName = medName.trim(),
-                                    dosage = dosage.trim(),
-                                    frequency = formattedFreq,
-                                    duration = duration.trim(),
-                                    instructions = instructions.trim()
-                                )
-                            )
-                            editingMedication = null
-                        }
-                    },
-                    enabled = medName.isNotBlank(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Save Changes")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingMedication = null }) { Text("Cancel") }
-            }
-        )
-
-        if (showDeleteConfirm) {
-            AlertDialog(
-                onDismissRequest = { showDeleteConfirm = false },
-                title = { Text("Delete Medication") },
-                text = { Text("Are you sure you want to remove \"${med.medicationName}\" from this prescription?") },
-                confirmButton = {
-                    TextButton(onClick = {
-                        viewModel.deleteMedication(med)
-                        showDeleteConfirm = false
-                        editingMedication = null
-                    }) {
-                        Text("Delete", color = MaterialTheme.colorScheme.error)
-                    }
+        val currentMed = editingMedication!!
+        key(currentMed.id) {
+            EditMedicationDialog(
+                medication = currentMed,
+                canDelete = (prescriptionWithMeds?.medications?.size ?: 0) > 1,
+                onDismiss = { editingMedication = null },
+                onSave = { updatedMed ->
+                    viewModel.updateMedication(updatedMed)
+                    editingMedication = null
                 },
-                dismissButton = {
-                    TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                onDelete = { medToDelete ->
+                    viewModel.deleteMedication(medToDelete)
+                    editingMedication = null
                 }
             )
         }
@@ -1186,5 +1061,164 @@ private fun MedicationDetailCard(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun EditMedicationDialog(
+    medication: com.example.medtrack.data.entity.PrescriptionMedication,
+    canDelete: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (com.example.medtrack.data.entity.PrescriptionMedication) -> Unit,
+    onDelete: (com.example.medtrack.data.entity.PrescriptionMedication) -> Unit
+) {
+    var medName by remember(medication.id) { mutableStateOf(medication.medicationName) }
+    var dosage by remember(medication.id) { mutableStateOf(medication.dosage) }
+    val (initM, initN, initE) = remember(medication.id) { FrequencyHelper.parseSchedule(medication.frequency) }
+    var morning by remember(medication.id) { mutableStateOf(initM) }
+    var noon by remember(medication.id) { mutableStateOf(initN) }
+    var night by remember(medication.id) { mutableStateOf(initE) }
+    var duration by remember(medication.id) { mutableStateOf(medication.duration) }
+    var instructions by remember(medication.id) { mutableStateOf(medication.instructions) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(medication.id) {
+        medName = medication.medicationName
+        dosage = medication.dosage
+        val (m, n, e) = FrequencyHelper.parseSchedule(medication.frequency)
+        morning = m
+        noon = n
+        night = e
+        duration = medication.duration
+        instructions = medication.instructions
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.EditNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text("Modify Medication", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OutlinedTextField(
+                    value = medName,
+                    onValueChange = { medName = it },
+                    label = { Text("Medication Name *") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = dosage,
+                        onValueChange = { dosage = it },
+                        label = { Text("Dosage") },
+                        placeholder = { Text("e.g. 500mg") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    OutlinedTextField(
+                        value = duration,
+                        onValueChange = { duration = it },
+                        label = { Text("Duration") },
+                        placeholder = { Text("e.g. 7 days") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                }
+
+                // 3-box Dosage Schedule (Morning - Noon - Night)
+                DosageScheduleInput(
+                    morning = morning,
+                    noon = noon,
+                    night = night,
+                    onMorningChange = { morning = it },
+                    onNoonChange = { noon = it },
+                    onNightChange = { night = it }
+                )
+
+                OutlinedTextField(
+                    value = instructions,
+                    onValueChange = { instructions = it },
+                    label = { Text("Special Instructions") },
+                    placeholder = { Text("e.g. Take with full glass of water") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                if (canDelete) {
+                    TextButton(
+                        onClick = { showDeleteConfirm = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Delete this medication")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (medName.isNotBlank()) {
+                        val formattedFreq = FrequencyHelper.formatSchedule(morning, noon, night)
+                        onSave(
+                            medication.copy(
+                                medicationName = medName.trim(),
+                                dosage = dosage.trim(),
+                                frequency = formattedFreq,
+                                duration = duration.trim(),
+                                instructions = instructions.trim()
+                            )
+                        )
+                    }
+                },
+                enabled = medName.isNotBlank(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Save Changes")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Medication") },
+            text = { Text("Are you sure you want to remove \"${medication.medicationName}\" from this prescription?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete(medication)
+                    showDeleteConfirm = false
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
     }
 }

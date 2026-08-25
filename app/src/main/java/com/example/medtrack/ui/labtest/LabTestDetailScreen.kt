@@ -471,285 +471,47 @@ fun LabTestDetailScreen(
 
     // Modal: Edit Lab Test Item Dialog
     if (editingItem != null) {
-        val testItem = editingItem!!
-        var editName by remember(testItem) { mutableStateOf(testItem.testName) }
-        var editCategory by remember(testItem) { mutableStateOf(testItem.category) }
-        var editResults by remember(testItem) { mutableStateOf(testItem.results) }
-        var editNormalRange by remember(testItem) { mutableStateOf(testItem.normalRange) }
-        var editNotes by remember(testItem) { mutableStateOf(testItem.notes) }
-        var testTypeDropdownExpanded by remember { mutableStateOf(false) }
-        var categoryDropdownExpanded by remember { mutableStateOf(false) }
-        var showDeleteConfirm by remember { mutableStateOf(false) }
-
-        val filteredEditTypes = remember(testTypes, editName) {
-            if (editName.isBlank()) testTypes
-            else {
-                val matches = testTypes.filter { it.name.contains(editName, ignoreCase = true) }
-                if (matches.isNotEmpty()) matches else testTypes
-            }
+        val currentItem = editingItem!!
+        key(currentItem.id) {
+            EditLabTestItemDialog(
+                testItem = currentItem,
+                testTypes = testTypes,
+                categoryOptions = viewModel.categoryOptions,
+                canDelete = (labTestWithItems?.items?.size ?: 0) > 1,
+                onDismiss = { editingItem = null },
+                onSave = { updatedItem ->
+                    viewModel.updateLabTestItem(updatedItem)
+                    editingItem = null
+                },
+                onDelete = { itemToDelete ->
+                    viewModel.deleteLabTestItem(itemToDelete)
+                    editingItem = null
+                },
+                onOpenManageTypes = { showManageTypesDialog = true },
+                onSaveNewTestType = { name, cat, range ->
+                    viewModel.addTestType(name, cat, range)
+                }
+            )
         }
+    }
 
-        AlertDialog(
-            onDismissRequest = { editingItem = null },
-            title = {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(Icons.Default.Edit, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Text("Modify Lab Test", fontWeight = FontWeight.Bold)
-                }
-            },
-            text = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    ExposedDropdownMenuBox(
-                        expanded = testTypeDropdownExpanded,
-                        onExpandedChange = { testTypeDropdownExpanded = !testTypeDropdownExpanded }
-                    ) {
-                        OutlinedTextField(
-                            value = editName,
-                            onValueChange = {
-                                editName = it
-                                testTypeDropdownExpanded = true
-                            },
-                            label = { Text("Select or Type Lab Test *") },
-                            placeholder = { Text("e.g. Complete Blood Count (CBC)") },
-                            leadingIcon = { Icon(Icons.Default.Science, contentDescription = null) },
-                            trailingIcon = {
-                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = testTypeDropdownExpanded)
-                            },
-                            modifier = Modifier
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true)
-                                .fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            singleLine = true
-                        )
-
-                        ExposedDropdownMenu(
-                            expanded = testTypeDropdownExpanded,
-                            onDismissRequest = { testTypeDropdownExpanded = false }
-                        ) {
-                            DropdownMenuItem(
-                                text = {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                                    ) {
-                                        Icon(
-                                            Icons.Default.AddCircleOutline,
-                                            contentDescription = null,
-                                            tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Text(
-                                            "Manage / Add New Test Types...",
-                                            fontWeight = FontWeight.Bold,
-                                            color = MaterialTheme.colorScheme.primary
-                                        )
-                                    }
-                                },
-                                onClick = {
-                                    testTypeDropdownExpanded = false
-                                    showManageTypesDialog = true
-                                }
-                            )
-
-                            HorizontalDivider()
-
-                            filteredEditTypes.forEach { type ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                type.name,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            Spacer(Modifier.width(8.dp))
-                                            CategoryBadge(category = type.defaultCategory)
-                                        }
-                                    },
-                                    onClick = {
-                                        editName = type.name
-                                        editCategory = type.defaultCategory
-                                        if (type.defaultNormalRange.isNotBlank()) {
-                                            editNormalRange = type.defaultNormalRange
-                                        }
-                                        testTypeDropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    if (editName.isNotBlank() && testTypes.none { it.name.equals(editName.trim(), ignoreCase = true) }) {
-                        Surface(
-                            shape = RoundedCornerShape(8.dp),
-                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 10.dp, vertical = 6.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(
-                                        Icons.Default.BookmarkAdd,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(16.dp)
-                                    )
-                                    Text(
-                                        "New test! Add to standard list?",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-
-                                TextButton(
-                                    onClick = {
-                                        viewModel.addTestType(editName.trim(), editCategory, editNormalRange.trim())
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
-                                ) {
-                                    Text("Save to List", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                                }
-                            }
-                        }
-                    }
-
-                    ExposedDropdownMenuBox(
-                        expanded = categoryDropdownExpanded,
-                        onExpandedChange = { categoryDropdownExpanded = !categoryDropdownExpanded }
-                    ) {
-                        OutlinedTextField(
-                            value = editCategory,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Category") },
-                            leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryDropdownExpanded) },
-                            modifier = Modifier
-                                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
-                                .fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        ExposedDropdownMenu(
-                            expanded = categoryDropdownExpanded,
-                            onDismissRequest = { categoryDropdownExpanded = false }
-                        ) {
-                            viewModel.categoryOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = {
-                                        editCategory = option
-                                        categoryDropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    OutlinedTextField(
-                        value = editResults,
-                        onValueChange = { editResults = it },
-                        label = { Text("Results / Findings") },
-                        placeholder = { Text("e.g. Hemoglobin: 14.2 g/dL") },
-                        minLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = editNormalRange,
-                        onValueChange = { editNormalRange = it },
-                        label = { Text("Normal Reference Range") },
-                        placeholder = { Text("e.g. 13.5 - 17.5 g/dL") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    OutlinedTextField(
-                        value = editNotes,
-                        onValueChange = { editNotes = it },
-                        label = { Text("Remarks / Notes") },
-                        minLines = 2,
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-
-                    if ((labTestWithItems?.items?.size ?: 0) > 1) {
-                        TextButton(
-                            onClick = { showDeleteConfirm = true },
-                            colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text("Delete this test")
-                        }
-                    }
-                }
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (editName.isNotBlank()) {
-                            viewModel.updateLabTestItem(
-                                testItem.copy(
-                                    testName = editName.trim(),
-                                    category = editCategory,
-                                    results = editResults.trim(),
-                                    normalRange = editNormalRange.trim(),
-                                    notes = editNotes.trim()
-                                )
-                            )
-                            editingItem = null
-                        }
-                    },
-                    enabled = editName.isNotBlank(),
-                    shape = RoundedCornerShape(10.dp)
-                ) {
-                    Text("Save Changes")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { editingItem = null }) { Text("Cancel") }
-            }
-        )
-
-        if (showDeleteConfirm) {
+    if (deletingItem != null) {
+        val target = deletingItem!!
+        key(target.id) {
             AlertDialog(
-                onDismissRequest = { showDeleteConfirm = false },
+                onDismissRequest = { deletingItem = null },
                 title = { Text("Delete Lab Test") },
-                text = { Text("Are you sure you want to remove \"${testItem.testName}\" from this lab report?") },
+                text = { Text("Are you sure you want to remove \"${target.testName}\" from this lab report?") },
                 confirmButton = {
                     TextButton(onClick = {
-                        viewModel.deleteLabTestItem(testItem)
-                        showDeleteConfirm = false
-                        editingItem = null
+                        viewModel.deleteLabTestItem(target)
+                        deletingItem = null
                     }) {
                         Text("Delete", color = MaterialTheme.colorScheme.error)
                     }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+                    TextButton(onClick = { deletingItem = null }) { Text("Cancel") }
                 }
             )
         }
@@ -1501,5 +1263,307 @@ private fun LabTestItemDetailCard(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditLabTestItemDialog(
+    testItem: LabTestItem,
+    testTypes: List<LabTestType>,
+    categoryOptions: List<String>,
+    canDelete: Boolean,
+    onDismiss: () -> Unit,
+    onSave: (LabTestItem) -> Unit,
+    onDelete: (LabTestItem) -> Unit,
+    onOpenManageTypes: () -> Unit,
+    onSaveNewTestType: (String, String, String) -> Unit
+) {
+    var editName by remember(testItem.id) { mutableStateOf(testItem.testName) }
+    var editCategory by remember(testItem.id) { mutableStateOf(testItem.category) }
+    var editResults by remember(testItem.id) { mutableStateOf(testItem.results) }
+    var editNormalRange by remember(testItem.id) { mutableStateOf(testItem.normalRange) }
+    var editNotes by remember(testItem.id) { mutableStateOf(testItem.notes) }
+    var testTypeDropdownExpanded by remember { mutableStateOf(false) }
+    var categoryDropdownExpanded by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(testItem.id) {
+        editName = testItem.testName
+        editCategory = testItem.category
+        editResults = testItem.results
+        editNormalRange = testItem.normalRange
+        editNotes = testItem.notes
+    }
+
+    val filteredEditTypes = remember(testTypes, editName) {
+        if (editName.isBlank()) testTypes
+        else {
+            val matches = testTypes.filter { it.name.contains(editName, ignoreCase = true) }
+            if (matches.isNotEmpty()) matches else testTypes
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(Icons.Default.EditNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Text("Modify Lab Test", fontWeight = FontWeight.Bold)
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                ExposedDropdownMenuBox(
+                    expanded = testTypeDropdownExpanded,
+                    onExpandedChange = { testTypeDropdownExpanded = !testTypeDropdownExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = editName,
+                        onValueChange = {
+                            editName = it
+                            testTypeDropdownExpanded = true
+                        },
+                        label = { Text("Select or Type Lab Test *") },
+                        placeholder = { Text("e.g. Complete Blood Count (CBC)") },
+                        leadingIcon = { Icon(Icons.Default.Science, contentDescription = null) },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(expanded = testTypeDropdownExpanded)
+                        },
+                        modifier = Modifier
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable, true)
+                            .fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        singleLine = true
+                    )
+
+                    ExposedDropdownMenu(
+                        expanded = testTypeDropdownExpanded,
+                        onDismissRequest = { testTypeDropdownExpanded = false }
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.AddCircleOutline,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Text(
+                                        "Manage / Add New Test Types...",
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            },
+                            onClick = {
+                                testTypeDropdownExpanded = false
+                                onOpenManageTypes()
+                            }
+                        )
+
+                        HorizontalDivider()
+
+                        filteredEditTypes.forEach { type ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            type.name,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Spacer(Modifier.width(8.dp))
+                                        CategoryBadge(category = type.defaultCategory)
+                                    }
+                                },
+                                onClick = {
+                                    editName = type.name
+                                    editCategory = type.defaultCategory
+                                    if (type.defaultNormalRange.isNotBlank()) {
+                                        editNormalRange = type.defaultNormalRange
+                                    }
+                                    testTypeDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                if (editName.isNotBlank() && testTypes.none { it.name.equals(editName.trim(), ignoreCase = true) }) {
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    Icons.Default.BookmarkAdd,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Text(
+                                    "New test! Add to standard list?",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            TextButton(
+                                onClick = {
+                                    onSaveNewTestType(editName.trim(), editCategory, editNormalRange.trim())
+                                },
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                            ) {
+                                Text("Save to List", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+
+                ExposedDropdownMenuBox(
+                    expanded = categoryDropdownExpanded,
+                    onExpandedChange = { categoryDropdownExpanded = !categoryDropdownExpanded }
+                ) {
+                    OutlinedTextField(
+                        value = editCategory,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Category") },
+                        leadingIcon = { Icon(Icons.Default.Category, contentDescription = null) },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = categoryDropdownExpanded) },
+                        modifier = Modifier
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable, true)
+                            .fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    )
+                    ExposedDropdownMenu(
+                        expanded = categoryDropdownExpanded,
+                        onDismissRequest = { categoryDropdownExpanded = false }
+                    ) {
+                        categoryOptions.forEach { option ->
+                            DropdownMenuItem(
+                                text = { Text(option) },
+                                onClick = {
+                                    editCategory = option
+                                    categoryDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = editResults,
+                    onValueChange = { editResults = it },
+                    label = { Text("Results / Findings") },
+                    placeholder = { Text("e.g. Hemoglobin: 14.2 g/dL") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = editNormalRange,
+                    onValueChange = { editNormalRange = it },
+                    label = { Text("Normal Reference Range") },
+                    placeholder = { Text("e.g. 13.5 - 17.5 g/dL") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                OutlinedTextField(
+                    value = editNotes,
+                    onValueChange = { editNotes = it },
+                    label = { Text("Remarks / Notes") },
+                    minLines = 2,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                if (canDelete) {
+                    TextButton(
+                        onClick = { showDeleteConfirm = true },
+                        colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                    ) {
+                        Icon(Icons.Default.DeleteOutline, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text("Delete this test")
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    if (editName.isNotBlank()) {
+                        onSave(
+                            testItem.copy(
+                                testName = editName.trim(),
+                                category = editCategory,
+                                results = editResults.trim(),
+                                normalRange = editNormalRange.trim(),
+                                notes = editNotes.trim()
+                            )
+                        )
+                    }
+                },
+                enabled = editName.isNotBlank(),
+                shape = RoundedCornerShape(10.dp)
+            ) {
+                Text("Save Changes")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
+
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("Delete Lab Test") },
+            text = { Text("Are you sure you want to remove \"${testItem.testName}\" from this lab report?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    onDelete(testItem)
+                    showDeleteConfirm = false
+                }) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) { Text("Cancel") }
+            }
+        )
     }
 }
