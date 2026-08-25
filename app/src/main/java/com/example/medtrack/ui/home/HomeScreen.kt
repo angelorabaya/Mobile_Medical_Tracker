@@ -1038,7 +1038,7 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                 }
             }
 
-            // Reference Range and Status Assessment Section
+            // Normal Range & Status Assessment Section (Range on top, Status underneath)
             if (item.recentNormalRange.isNotBlank() || item.statusTransition.isNotBlank()) {
                 Surface(
                     shape = RoundedCornerShape(8.dp),
@@ -1048,9 +1048,40 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 10.dp, vertical = 7.dp),
-                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
+                        // 1. Normal Range (rendered first on top)
+                        if (item.recentNormalRange.isNotBlank()) {
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
+                            ) {
+                                Text(
+                                    "Normal Range:",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    item.recentNormalRange,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+                        }
+
+                        // Divider between range and status if both exist
+                        if (item.recentNormalRange.isNotBlank() && item.statusTransition.isNotBlank()) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                                thickness = 0.5.dp
+                            )
+                        }
+
+                        // 2. Status / Assessment (rendered cleanly under the range)
                         if (item.statusTransition.isNotBlank()) {
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
@@ -1058,41 +1089,30 @@ private fun ComparativeLabItemCard(item: LabTestComparison) {
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    "Assessment:",
+                                    "Status / Finding:",
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(
-                                    item.statusTransition,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
                                     color = when {
-                                        item.statusTransition.contains("Out of Range") -> Color(0xFFD32F2F)
-                                        item.statusTransition.contains("Normal") || item.statusTransition.contains("Improved") -> Color(0xFF2E7D32)
-                                        else -> MaterialTheme.colorScheme.onSurface
+                                        item.statusTransition.contains("Out of Range") -> Color(0xFFFFEBEE)
+                                        item.statusTransition.contains("Normal") || item.statusTransition.contains("Improved") -> Color(0xFFE8F5E9)
+                                        else -> MaterialTheme.colorScheme.surfaceVariant
                                     }
-                                )
-                            }
-                        }
-
-                        if (item.recentNormalRange.isNotBlank()) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.Top
-                            ) {
-                                Text(
-                                    "Normal Range:",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                Text(
-                                    item.recentNormalRange,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    modifier = Modifier.padding(start = 8.dp)
-                                )
+                                ) {
+                                    Text(
+                                        text = item.statusTransition,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = when {
+                                            item.statusTransition.contains("Out of Range") -> Color(0xFFD32F2F)
+                                            item.statusTransition.contains("Normal") || item.statusTransition.contains("Improved") -> Color(0xFF2E7D32)
+                                            else -> MaterialTheme.colorScheme.onSurface
+                                        },
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                    )
+                                }
                             }
                         }
                     }
