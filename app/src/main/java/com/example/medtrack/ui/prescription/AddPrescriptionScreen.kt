@@ -25,6 +25,10 @@ fun AddPrescriptionScreen(
     modifier: Modifier = Modifier,
     viewModel: AddPrescriptionViewModel = viewModel()
 ) {
+    LaunchedEffect(Unit) {
+        viewModel.resetState()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(

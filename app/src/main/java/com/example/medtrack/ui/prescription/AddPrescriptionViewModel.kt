@@ -95,6 +95,17 @@ class AddPrescriptionViewModel(application: Application) : AndroidViewModel(appl
         }
     }
 
+    fun resetState() {
+        title = ""
+        doctorName = ""
+        datePrescribed = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date())
+        notes = ""
+        imageUri = null
+        errorMessage = null
+        medications.clear()
+        medications.add(MedicationInput())
+    }
+
     fun savePrescription(onComplete: () -> Unit) {
         val validMeds = medications.filter { it.name.isNotBlank() }
         if (validMeds.isEmpty()) {
@@ -131,6 +142,7 @@ class AddPrescriptionViewModel(application: Application) : AndroidViewModel(appl
             }
 
             db.prescriptionDao().insertPrescriptionWithMedications(prescription, prescriptionMeds)
+            resetState()
             onComplete()
         }
     }

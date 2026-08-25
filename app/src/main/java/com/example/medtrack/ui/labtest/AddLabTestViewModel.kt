@@ -188,6 +188,18 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
         }
     }
 
+    fun resetState() {
+        title = ""
+        testDate = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        labName = ""
+        doctorName = ""
+        notes = ""
+        imageUri = null
+        errorMessage = null
+        items.clear()
+        items.add(LabTestItemInput())
+    }
+
     fun saveLabTest(onComplete: () -> Unit) {
         val validItems = items.filter { it.testName.isNotBlank() }
         if (validItems.isEmpty()) {
@@ -224,6 +236,7 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
 
             db.labTestDao().insertLabTestWithItems(labTest, labTestItems)
             withContext(Dispatchers.Main) {
+                resetState()
                 onComplete()
             }
         }

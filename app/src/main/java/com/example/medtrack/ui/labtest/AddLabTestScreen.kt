@@ -33,6 +33,10 @@ fun AddLabTestScreen(
     val testTypes by viewModel.testTypes.collectAsStateWithLifecycle()
     var showManageTypesDialog by remember { mutableStateOf(false) }
 
+    LaunchedEffect(Unit) {
+        viewModel.resetState()
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
