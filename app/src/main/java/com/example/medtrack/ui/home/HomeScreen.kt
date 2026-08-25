@@ -69,7 +69,7 @@ fun HomeScreen(
                         }
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            "MedTrack",
+                            "VitalsIQ",
                             fontWeight = FontWeight.ExtraBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
@@ -204,7 +204,7 @@ private fun WelcomeHeroCard(onGetStarted: () -> Unit) {
 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        "Welcome to MedTrack",
+                        "Welcome to VitalsIQ",
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
                         color = Color.White

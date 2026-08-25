@@ -1,4 +1,4 @@
-﻿# 🏥 MedTrack — Mobile Medical Tracker
+# 🏥 VitalsIQ — Intelligent Mobile Health & Medical Tracker
 
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0+-7F52FF.svg?logo=kotlin&logoColor=white)](https://kotlinlang.org)
 [![Android](https://img.shields.io/badge/Platform-Android-3DDC84.svg?logo=android&logoColor=white)](https://developer.android.com)
@@ -7,11 +7,16 @@
 [![Room Database](https://img.shields.io/badge/Storage-Room%20DB-FFA000.svg)](https://developer.android.com/training/data-storage/room)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**MedTrack** is a modern, private, local-first Android application designed to help patients and caregivers systematically track, manage, and review their comprehensive healthcare records. From itemized lab test panels with real-time reference range evaluations to multi-drug prescription schedules, high-resolution document scans, and daily medicine alarms, MedTrack ensures critical health data is organized, secure, and accessible at your fingertips.
+**VitalsIQ** is a modern, private, local-first Android application designed to help patients and caregivers systematically track, manage, and review their comprehensive healthcare records. From itemized lab test panels with real-time reference range evaluations and comparative trend analysis to multi-drug prescription schedules, high-resolution document scans, and daily medicine alarms, VitalsIQ ensures critical health data is organized, secure, and accessible at your fingertips.
 
 ---
 
 ## ✨ Key Features
+
+### 📊 Comparative Lab Panel Review
+- **Chronological Shift Tracking**: Automatically analyzes recent vs. previous lab findings for each test description over time.
+- **Elevated vs. Decreased Trend Analytics**: Computes numeric deltas and status shifts (e.g. `▲ Elevated (+15 mg/dL)`, `▼ Decreased (-25 mg/dL)`, `— Stable`).
+- **Health Dashboard Integration**: Collapsible panel on the home screen with search filters (`Elevated`, `Decreased`, `Stable`, `Baseline`) and historical finding timelines.
 
 ### 🧪 Advanced Lab Test Management
 - **Single & Multi-Test Panels**: Record lab visits containing multiple itemized procedures under a single order (e.g. *Lipid Profile* broken down into *Total Cholesterol*, *Triglycerides*, *HDL*, *LDL*; *Complete Blood Count (CBC)*; *Liver Function Panels*; *Thyroid Profiles*).
@@ -122,7 +127,7 @@ com.example.medtrack
 
 ## 🧪 Unit Testing
 
-MedTrack includes unit tests for core business logic, such as the clinical reference range evaluator:
+VitalsIQ includes comprehensive unit tests for core business logic, such as the clinical reference range evaluator and comparative panel trend analytics:
 ```bash
 ./gradlew testDebugUnitTest --tests "com.example.medtrack.util.LabResultEvaluatorTest"
 ```
