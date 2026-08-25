@@ -1,4 +1,4 @@
-﻿package com.example.medtrack.util
+package com.example.medtrack.util
 
 import androidx.compose.ui.graphics.Color
 import java.util.Locale
@@ -79,6 +79,39 @@ object AsianBmiCalculator {
         val minWeight = 18.5 * (heightM * heightM)
         val maxWeight = 22.9 * (heightM * heightM)
         return Pair(minWeight, maxWeight)
+    }
+
+    fun feetInchesToCm(feet: Int, inches: Double): Double {
+        val totalInches = (feet * 12) + inches
+        return totalInches * 2.54
+    }
+
+    fun cmToFeetInches(heightCm: Double): Pair<Int, Double> {
+        if (heightCm <= 0) return Pair(0, 0.0)
+        val totalInches = heightCm / 2.54
+        val feet = (totalInches / 12).toInt()
+        val remainingInches = totalInches - (feet * 12)
+        val roundedInches = Math.round(remainingInches * 10.0) / 10.0
+        return if (roundedInches >= 12.0) {
+            Pair(feet + 1, 0.0)
+        } else {
+            Pair(feet, roundedInches)
+        }
+    }
+
+    fun formatFeetInches(feet: Int, inches: Double): String {
+        return if (inches % 1.0 == 0.0) {
+            "$feet ft ${inches.toInt()} in"
+        } else {
+            String.format(Locale.US, "%d ft %.1f in", feet, inches)
+        }
+    }
+
+    fun formatHeightWithFeetInches(heightCm: Double): String {
+        val (ft, inc) = cmToFeetInches(heightCm)
+        val ftInStr = formatFeetInches(ft, inc)
+        val cmStr = formatHeight(heightCm)
+        return "$ftInStr ($cmStr cm)"
     }
 
     fun formatBmi(bmi: Double): String {

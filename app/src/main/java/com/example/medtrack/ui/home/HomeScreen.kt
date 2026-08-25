@@ -1270,18 +1270,37 @@ fun AsianBmiCalculatorCard(
 ) {
     var isExpanded by remember { mutableStateOf(false) }
     var weightInput by remember { mutableStateOf("") }
-    var heightInput by remember { mutableStateOf("") }
+    var feetInput by remember { mutableStateOf("") }
+    var inchesInput by remember { mutableStateOf("") }
     var calculatedBmi by remember { mutableStateOf<Double?>(null) }
     var calculatedCategory by remember { mutableStateOf<AsianBmiCategory?>(null) }
     var showSavedNotification by remember { mutableStateOf(false) }
 
     // Synchronize inputs with latest record when loaded
     LaunchedEffect(latestRecord) {
-        if (latestRecord != null && weightInput.isEmpty() && heightInput.isEmpty()) {
+        if (latestRecord != null && weightInput.isEmpty() && feetInput.isEmpty() && inchesInput.isEmpty()) {
             weightInput = AsianBmiCalculator.formatWeight(latestRecord.weightKg)
-            heightInput = AsianBmiCalculator.formatHeight(latestRecord.heightCm)
+            val (ft, inc) = AsianBmiCalculator.cmToFeetInches(latestRecord.heightCm)
+            feetInput = if (ft > 0) ft.toString() else ""
+            inchesInput = if (inc > 0.0) {
+                if (inc % 1.0 == 0.0) inc.toInt().toString() else String.format(Locale.US, "%.1f", inc)
+            } else if (ft > 0) "0" else ""
             calculatedBmi = latestRecord.bmi
             calculatedCategory = AsianBmiCategory.fromBmi(latestRecord.bmi)
+        }
+    }
+
+    val recalculate = { wStr: String, ftStr: String, inStr: String ->
+        val w = wStr.toDoubleOrNull()
+        val ft = ftStr.toIntOrNull()
+        val inc = inStr.toDoubleOrNull() ?: 0.0
+        if (w != null && ft != null && w > 0 && ft > 0 && inc >= 0 && inc < 12.0) {
+            val totalCm = AsianBmiCalculator.feetInchesToCm(ft, inc)
+            val bmi = AsianBmiCalculator.calculateBmi(w, totalCm)
+            if (bmi != null) {
+                calculatedBmi = bmi
+                calculatedCategory = AsianBmiCategory.fromBmi(bmi)
+            }
         }
     }
 
@@ -1366,60 +1385,86 @@ fun AsianBmiCalculatorCard(
                     modifier = Modifier.padding(top = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Input Row (Weight & Height)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = weightInput,
-                            onValueChange = { input ->
-                                if (input.isEmpty() || input.matches(Regex("""^\d*\.?\d*$"""))) {
-                                    weightInput = input
-                                    showSavedNotification = false
-                                    val w = input.toDoubleOrNull()
-                                    val h = heightInput.toDoubleOrNull()
-                                    if (w != null && h != null && w > 0 && h > 0) {
-                                        val bmi = AsianBmiCalculator.calculateBmi(w, h)
-                                        if (bmi != null) {
-                                            calculatedBmi = bmi
-                                            calculatedCategory = AsianBmiCategory.fromBmi(bmi)
-                                        }
-                                    }
-                                }
-                            },
-                            label = { Text("Weight (kg)") },
-                            placeholder = { Text("e.g. 65") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        )
+                    // Weight Input Row
+                    OutlinedTextField(
+                        value = weightInput,
+                        onValueChange = { input ->
+                            if (input.isEmpty() || input.matches(Regex("""^\d*\.?\d*$"""))) {
+                                weightInput = input
+                                showSavedNotification = false
+                                recalculate(input, feetInput, inchesInput)
+                            }
+                        },
+                        label = { Text("Weight (kg)") },
+                        placeholder = { Text("e.g. 65") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        singleLine = true,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    )
 
-                        OutlinedTextField(
-                            value = heightInput,
-                            onValueChange = { input ->
-                                if (input.isEmpty() || input.matches(Regex("""^\d*\.?\d*$"""))) {
-                                    heightInput = input
-                                    showSavedNotification = false
-                                    val w = weightInput.toDoubleOrNull()
-                                    val h = input.toDoubleOrNull()
-                                    if (w != null && h != null && w > 0 && h > 0) {
-                                        val bmi = AsianBmiCalculator.calculateBmi(w, h)
-                                        if (bmi != null) {
-                                            calculatedBmi = bmi
-                                            calculatedCategory = AsianBmiCategory.fromBmi(bmi)
+                    // Height Input: Feet and Inches Row
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            "Height (Feet & Inches)",
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            OutlinedTextField(
+                                value = feetInput,
+                                onValueChange = { input ->
+                                    if (input.isEmpty() || (input.matches(Regex("""^\d+$""")) && input.toInt() <= 9)) {
+                                        feetInput = input
+                                        showSavedNotification = false
+                                        recalculate(weightInput, input, inchesInput)
+                                    }
+                                },
+                                label = { Text("Feet (ft)") },
+                                placeholder = { Text("e.g. 5") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f)
+                            )
+
+                            OutlinedTextField(
+                                value = inchesInput,
+                                onValueChange = { input ->
+                                    if (input.isEmpty() || input.matches(Regex("""^\d*\.?\d*$"""))) {
+                                        val num = input.toDoubleOrNull()
+                                        if (num == null || num < 12.0) {
+                                            inchesInput = input
+                                            showSavedNotification = false
+                                            recalculate(weightInput, feetInput, input)
                                         }
                                     }
-                                }
-                            },
-                            label = { Text("Height (cm)") },
-                            placeholder = { Text("e.g. 170") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            singleLine = true,
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.weight(1f)
-                        )
+                                },
+                                label = { Text("Inches (in)") },
+                                placeholder = { Text("e.g. 7") },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                                singleLine = true,
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+
+                        // Converted metric height indicator
+                        val ftVal = feetInput.toIntOrNull()
+                        val incVal = inchesInput.toDoubleOrNull() ?: 0.0
+                        if (ftVal != null && ftVal > 0) {
+                            val totalCm = AsianBmiCalculator.feetInchesToCm(ftVal, incVal)
+                            Text(
+                                "Total Height: ${AsianBmiCalculator.formatFeetInches(ftVal, incVal)} (${AsianBmiCalculator.formatHeight(totalCm)} cm)",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
                     }
 
                     // Action buttons (Calculate & Save / Clear)
@@ -1430,19 +1475,21 @@ fun AsianBmiCalculatorCard(
                         Button(
                             onClick = {
                                 val w = weightInput.toDoubleOrNull()
-                                val h = heightInput.toDoubleOrNull()
-                                if (w != null && h != null && w > 0 && h > 0) {
-                                    val bmi = AsianBmiCalculator.calculateBmi(w, h)
+                                val ft = feetInput.toIntOrNull()
+                                val inc = inchesInput.toDoubleOrNull() ?: 0.0
+                                if (w != null && ft != null && w > 0 && ft > 0 && inc >= 0) {
+                                    val totalCm = AsianBmiCalculator.feetInchesToCm(ft, inc)
+                                    val bmi = AsianBmiCalculator.calculateBmi(w, totalCm)
                                     if (bmi != null) {
                                         val cat = AsianBmiCategory.fromBmi(bmi)
                                         calculatedBmi = bmi
                                         calculatedCategory = cat
-                                        onSaveRecord(w, h, bmi, cat.label)
+                                        onSaveRecord(w, totalCm, bmi, cat.label)
                                         showSavedNotification = true
                                     }
                                 }
                             },
-                            enabled = weightInput.toDoubleOrNull() != null && heightInput.toDoubleOrNull() != null,
+                            enabled = weightInput.toDoubleOrNull() != null && feetInput.toIntOrNull() != null,
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.weight(1f)
                         ) {
@@ -1451,11 +1498,12 @@ fun AsianBmiCalculatorCard(
                             Text("Calculate & Record", fontWeight = FontWeight.Bold)
                         }
 
-                        if (weightInput.isNotEmpty() || heightInput.isNotEmpty()) {
+                        if (weightInput.isNotEmpty() || feetInput.isNotEmpty() || inchesInput.isNotEmpty()) {
                             OutlinedButton(
                                 onClick = {
                                     weightInput = ""
-                                    heightInput = ""
+                                    feetInput = ""
+                                    inchesInput = ""
                                     calculatedBmi = null
                                     calculatedCategory = null
                                     showSavedNotification = false
@@ -1498,7 +1546,13 @@ fun AsianBmiCalculatorCard(
                     if (calculatedBmi != null && calculatedCategory != null) {
                         val category = calculatedCategory!!
                         val bmi = calculatedBmi!!
-                        val heightVal = heightInput.toDoubleOrNull() ?: latestRecord?.heightCm
+                        val ftVal = feetInput.toIntOrNull()
+                        val incVal = inchesInput.toDoubleOrNull() ?: 0.0
+                        val heightVal = if (ftVal != null && ftVal > 0) {
+                            AsianBmiCalculator.feetInchesToCm(ftVal, incVal)
+                        } else {
+                            latestRecord?.heightCm
+                        }
 
                         Surface(
                             shape = RoundedCornerShape(16.dp),
@@ -1593,7 +1647,7 @@ fun AsianBmiCalculatorCard(
                                                 )
                                                 Column {
                                                     Text(
-                                                        "Healthy Weight for ${AsianBmiCalculator.formatHeight(heightVal)} cm (Asian Std):",
+                                                        "Healthy Weight for ${AsianBmiCalculator.formatHeightWithFeetInches(heightVal)} (Asian Std):",
                                                         style = MaterialTheme.typography.labelSmall,
                                                         fontWeight = FontWeight.Bold,
                                                         color = MaterialTheme.colorScheme.onSurface
@@ -1637,7 +1691,7 @@ fun AsianBmiCalculatorCard(
                                             .format(Date(latestRecord.calculatedAt))
                                     }
                                     Text(
-                                        "Last recorded: $dateStr (${AsianBmiCalculator.formatWeight(latestRecord.weightKg)} kg, ${AsianBmiCalculator.formatHeight(latestRecord.heightCm)} cm)",
+                                        "Last recorded: $dateStr (${AsianBmiCalculator.formatWeight(latestRecord.weightKg)} kg, ${AsianBmiCalculator.formatHeightWithFeetInches(latestRecord.heightCm)})",
                                         style = MaterialTheme.typography.labelSmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
                                     )
