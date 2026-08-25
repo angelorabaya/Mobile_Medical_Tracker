@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.medtrack.MedTrackApplication
 import com.example.medtrack.data.entity.Prescription
 import com.example.medtrack.data.entity.PrescriptionWithMedications
+import com.example.medtrack.util.DateUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -24,6 +25,17 @@ class PrescriptionListViewModel(application: Application) : AndroidViewModel(app
                     else db.prescriptionDao().getPrescriptionsWithMedications(patient.id)
                 }
             } else flowOf(emptyList())
+        }
+        .map { list ->
+            list.sortedWith { a, b ->
+                val dateComparison = DateUtils.newestFirstComparator.compare(a.prescription.datePrescribed, b.prescription.datePrescribed)
+                if (dateComparison != 0) {
+                    dateComparison
+                } else {
+                    val createdComparison = b.prescription.createdAt.compareTo(a.prescription.createdAt)
+                    if (createdComparison != 0) createdComparison else b.prescription.id.compareTo(a.prescription.id)
+                }
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

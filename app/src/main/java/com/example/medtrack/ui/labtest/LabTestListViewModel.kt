@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.medtrack.MedTrackApplication
 import com.example.medtrack.data.entity.LabTest
 import com.example.medtrack.data.entity.LabTestWithItems
+import com.example.medtrack.util.DateUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -18,6 +19,17 @@ class LabTestListViewModel(application: Application) : AndroidViewModel(applicat
         .flatMapLatest { patient ->
             if (patient != null) db.labTestDao().getLabTestsWithItems(patient.id)
             else flowOf(emptyList())
+        }
+        .map { list ->
+            list.sortedWith { a, b ->
+                val dateComparison = DateUtils.newestFirstComparator.compare(a.labTest.testDate, b.labTest.testDate)
+                if (dateComparison != 0) {
+                    dateComparison
+                } else {
+                    val createdComparison = b.labTest.createdAt.compareTo(a.labTest.createdAt)
+                    if (createdComparison != 0) createdComparison else b.labTest.id.compareTo(a.labTest.id)
+                }
+            }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
