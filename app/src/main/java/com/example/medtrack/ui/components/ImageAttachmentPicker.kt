@@ -1,5 +1,7 @@
 package com.example.medtrack.ui.components
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -22,6 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
 import com.example.medtrack.util.ImageUtils
 import java.io.File
@@ -49,6 +52,29 @@ fun ImageAttachmentPicker(
             } else {
                 onImageSelected(tempCameraFile?.absolutePath)
             }
+        }
+    }
+
+    val launchCamera = {
+        val (file, uri) = ImageUtils.createImageFileUri(context)
+        tempCameraFile = file
+        tempCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchCamera()
+        }
+    }
+
+    val onTakePhotoClick = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchCamera()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -148,12 +174,7 @@ fun ImageAttachmentPicker(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
-                    onClick = {
-                        val (file, uri) = ImageUtils.createImageFileUri(context)
-                        tempCameraFile = file
-                        tempCameraUri = uri
-                        cameraLauncher.launch(uri)
-                    },
+                    onClick = { onTakePhotoClick() },
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(12.dp)

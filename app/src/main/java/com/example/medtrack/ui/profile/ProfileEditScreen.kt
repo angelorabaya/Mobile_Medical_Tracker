@@ -1,5 +1,7 @@
 package com.example.medtrack.ui.profile
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -23,6 +25,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.medtrack.util.ImageUtils
@@ -46,6 +49,29 @@ fun ProfileEditScreen(
         if (success && tempCameraFile != null) {
             val savedPath = ImageUtils.saveImageToInternalStorage(context, Uri.fromFile(tempCameraFile))
             viewModel.photoUri = savedPath ?: tempCameraFile?.absolutePath ?: ""
+        }
+    }
+
+    val launchCamera = {
+        val (file, uri) = ImageUtils.createImageFileUri(context)
+        tempCameraFile = file
+        tempCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchCamera()
+        }
+    }
+
+    val onTakePhotoClick = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchCamera()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
         }
     }
 
@@ -169,12 +195,7 @@ fun ProfileEditScreen(
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
                             OutlinedButton(
-                                onClick = {
-                                    val (file, uri) = ImageUtils.createImageFileUri(context)
-                                    tempCameraFile = file
-                                    tempCameraUri = uri
-                                    cameraLauncher.launch(uri)
-                                },
+                                onClick = { onTakePhotoClick() },
                                 modifier = Modifier.weight(1f),
                                 shape = RoundedCornerShape(12.dp),
                                 contentPadding = PaddingValues(10.dp)

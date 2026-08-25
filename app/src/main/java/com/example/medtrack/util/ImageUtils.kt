@@ -16,11 +16,9 @@ object ImageUtils {
         val storageDir = File(context.cacheDir, "images").apply {
             if (!exists()) mkdirs()
         }
-        val imageFile = File.createTempFile(
-            "JPEG_${timeStamp}_",
-            ".jpg",
-            storageDir
-        )
+        val imageFile = File(storageDir, "JPEG_${timeStamp}_${System.currentTimeMillis()}.jpg").apply {
+            if (!exists()) createNewFile()
+        }
         val uri = FileProvider.getUriForFile(
             context,
             "${context.packageName}.fileprovider",
