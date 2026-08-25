@@ -19,6 +19,7 @@ class RegistrationViewModel(application: Application) : AndroidViewModel(applica
     var bloodType by mutableStateOf("")
     var allergies by mutableStateOf("")
     var emergencyContact by mutableStateOf("")
+    var photoUri by mutableStateOf("")
     var errorMessage by mutableStateOf<String?>(null)
 
     val genderOptions = listOf("Male", "Female", "Other")
@@ -38,7 +39,8 @@ class RegistrationViewModel(application: Application) : AndroidViewModel(applica
                     gender = gender,
                     bloodType = bloodType,
                     allergies = allergies.trim(),
-                    emergencyContact = emergencyContact.trim()
+                    emergencyContact = emergencyContact.trim(),
+                    photoUri = photoUri.trim()
                 )
             )
             onComplete()

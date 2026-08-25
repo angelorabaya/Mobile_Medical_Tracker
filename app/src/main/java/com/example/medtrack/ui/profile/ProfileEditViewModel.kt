@@ -18,6 +18,7 @@ class ProfileEditViewModel(application: Application) : AndroidViewModel(applicat
     var bloodType by mutableStateOf("")
     var allergies by mutableStateOf("")
     var emergencyContact by mutableStateOf("")
+    var photoUri by mutableStateOf("")
     var errorMessage by mutableStateOf<String?>(null)
     var isLoading by mutableStateOf(true)
 
@@ -37,6 +38,7 @@ class ProfileEditViewModel(application: Application) : AndroidViewModel(applicat
                 bloodType = patient.bloodType
                 allergies = patient.allergies
                 emergencyContact = patient.emergencyContact
+                photoUri = patient.photoUri
             }
             isLoading = false
         }
@@ -57,7 +59,8 @@ class ProfileEditViewModel(application: Application) : AndroidViewModel(applicat
                     gender = gender,
                     bloodType = bloodType,
                     allergies = allergies.trim(),
-                    emergencyContact = emergencyContact.trim()
+                    emergencyContact = emergencyContact.trim(),
+                    photoUri = photoUri.trim()
                 )
             )
             onComplete()

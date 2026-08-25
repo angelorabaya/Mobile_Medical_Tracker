@@ -20,13 +20,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.medtrack.data.entity.Patient
 import com.example.medtrack.theme.*
+import java.io.File
 import com.example.medtrack.ui.components.CategoryBadge
 import com.example.medtrack.util.ComparisonTrend
 import com.example.medtrack.util.LabResultEvaluator
@@ -83,13 +86,24 @@ fun HomeScreen(
                                 color = MaterialTheme.colorScheme.primaryContainer,
                                 modifier = Modifier.size(36.dp)
                             ) {
-                                Box(contentAlignment = Alignment.Center) {
-                                    Icon(
-                                        Icons.Default.AccountCircle,
+                                if (patient?.photoUri?.isNotBlank() == true) {
+                                    AsyncImage(
+                                        model = File(patient!!.photoUri),
                                         contentDescription = "Profile",
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(22.dp)
+                                        modifier = Modifier
+                                            .fillMaxSize()
+                                            .clip(CircleShape),
+                                        contentScale = ContentScale.Crop
                                     )
+                                } else {
+                                    Box(contentAlignment = Alignment.Center) {
+                                        Icon(
+                                            Icons.Default.AccountCircle,
+                                            contentDescription = "Profile",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(22.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -278,15 +292,26 @@ private fun PatientHeroCard(patient: Patient, onEdit: () -> Unit) {
                         Surface(
                             shape = CircleShape,
                             color = Color.White.copy(alpha = 0.2f),
-                            modifier = Modifier.size(50.dp)
+                            modifier = Modifier.size(52.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Icon(
-                                    Icons.Default.AccountCircle,
-                                    contentDescription = null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(32.dp)
+                            if (patient.photoUri.isNotBlank()) {
+                                AsyncImage(
+                                    model = File(patient.photoUri),
+                                    contentDescription = "Patient Photo",
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
                                 )
+                            } else {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Icon(
+                                        Icons.Default.AccountCircle,
+                                        contentDescription = null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(34.dp)
+                                    )
+                                }
                             }
                         }
 

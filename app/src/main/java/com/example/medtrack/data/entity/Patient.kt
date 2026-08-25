@@ -12,5 +12,6 @@ data class Patient(
     val bloodType: String = "",
     val allergies: String = "",
     val emergencyContact: String = "",
+    val photoUri: String = "",
     val createdAt: Long = System.currentTimeMillis()
 )

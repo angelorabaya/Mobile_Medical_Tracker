@@ -17,7 +17,7 @@ import com.example.medtrack.data.entity.*
         MedicineReminder::class,
         LabTestType::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class MedTrackDatabase : RoomDatabase() {
