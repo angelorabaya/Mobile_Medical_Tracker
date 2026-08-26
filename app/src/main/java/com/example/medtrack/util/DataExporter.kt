@@ -156,6 +156,7 @@ class DataExporter(private val container: AppContainer) {
         put("facilityName", o.facilityName)
         put("fastingInstructions", o.fastingInstructions)
         put("notes", o.notes)
+        put("imageUri", o.imageUri)
         put("isReminderEnabled", o.isReminderEnabled)
         put("isCompleted", o.isCompleted)
         put("createdAt", o.createdAt)
@@ -309,6 +310,7 @@ class DataExporter(private val container: AppContainer) {
                     facilityName = o.optString("facilityName"),
                     fastingInstructions = o.optString("fastingInstructions"),
                     notes = o.optString("notes"),
+                    imageUri = o.optString("imageUri").ifBlank { null },
                     isReminderEnabled = o.optBoolean("isReminderEnabled", true),
                     isCompleted = o.optBoolean("isCompleted", false),
                     createdAt = o.optLong("createdAt", System.currentTimeMillis())

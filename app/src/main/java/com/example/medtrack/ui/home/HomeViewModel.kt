@@ -85,7 +85,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         facilityName: String,
         fastingInstructions: String,
         notes: String,
-        isReminderEnabled: Boolean
+        isReminderEnabled: Boolean,
+        imageUri: String? = null
     ) {
         val currentPatientId = patient.value?.id ?: return
         viewModelScope.launch {
@@ -97,12 +98,23 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 facilityName = facilityName.trim(),
                 fastingInstructions = fastingInstructions.trim(),
                 notes = notes.trim(),
+                imageUri = imageUri,
                 isReminderEnabled = isReminderEnabled
             )
             val id = container.pendingLabOrderRepository.insert(order).toInt()
             val insertedOrder = order.copy(id = id)
             if (isReminderEnabled) {
                 ReminderScheduler.scheduleLabOrderReminder(getApplication(), insertedOrder)
+            }
+        }
+    }
+
+    fun updatePendingLabOrder(order: PendingLabOrder) {
+        viewModelScope.launch {
+            container.pendingLabOrderRepository.update(order)
+            ReminderScheduler.cancelLabOrderReminder(getApplication(), order.id)
+            if (order.isReminderEnabled && !order.isCompleted) {
+                ReminderScheduler.scheduleLabOrderReminder(getApplication(), order)
             }
         }
     }

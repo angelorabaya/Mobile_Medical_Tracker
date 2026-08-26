@@ -27,6 +27,7 @@ data class PendingLabOrder(
     val facilityName: String = "",
     val fastingInstructions: String = "",
     val notes: String = "",
+    val imageUri: String? = null,
     val isReminderEnabled: Boolean = true,
     val isCompleted: Boolean = false,
     val createdAt: Long = System.currentTimeMillis()

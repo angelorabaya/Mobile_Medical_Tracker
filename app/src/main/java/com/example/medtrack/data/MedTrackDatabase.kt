@@ -23,7 +23,7 @@ import net.sqlcipher.database.SupportFactory
         BmiRecord::class,
         PendingLabOrder::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class MedTrackDatabase : RoomDatabase() {
@@ -87,6 +87,13 @@ abstract class MedTrackDatabase : RoomDatabase() {
             }
         }
 
+        /** v10 → v11: add optional photo attachment to pending_lab_orders. */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE pending_lab_orders ADD COLUMN imageUri TEXT DEFAULT NULL")
+            }
+        }
+
         @Volatile
         private var INSTANCE: MedTrackDatabase? = null
 
@@ -102,7 +109,7 @@ abstract class MedTrackDatabase : RoomDatabase() {
                         SupportFactory(DbKeyManager.getOrCreatePassphrase(context.applicationContext))
                     )
                     // Register migrations here as schema versions evolve, e.g.
-                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10)
+                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
                     .fallbackToDestructiveMigration(true)
                     .build()
                 INSTANCE = instance

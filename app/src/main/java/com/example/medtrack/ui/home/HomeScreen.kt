@@ -1,10 +1,16 @@
 package com.example.medtrack.ui.home
 
+import android.Manifest
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -30,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -38,7 +45,10 @@ import com.example.medtrack.data.entity.Patient
 import com.example.medtrack.data.entity.PendingLabOrder
 import com.example.medtrack.theme.*
 import com.example.medtrack.ui.components.CategoryBadge
+import com.example.medtrack.ui.components.StatelessImageAttachmentPicker
+import com.example.medtrack.ui.components.ZoomableImageDialog
 import com.example.medtrack.util.AsianBmiCalculator
+import com.example.medtrack.util.ImageUtils
 import com.example.medtrack.util.AsianBmiCategory
 import com.example.medtrack.util.ComparisonTrend
 import com.example.medtrack.util.LabResultEvaluator
@@ -189,8 +199,11 @@ fun HomeScreen(
                 PendingLabOrderCard(
                     orders = pendingLabOrders,
                     availableTestTypes = availableLabTestTypes,
-                    onSaveOrder = { testName, date, time, facility, prep, notes, reminder ->
-                        viewModel.savePendingLabOrder(testName, date, time, facility, prep, notes, reminder)
+                    onSaveOrder = { testName, date, time, facility, prep, notes, reminder, imageUri ->
+                        viewModel.savePendingLabOrder(testName, date, time, facility, prep, notes, reminder, imageUri)
+                    },
+                    onUpdateOrder = { order ->
+                        viewModel.updatePendingLabOrder(order)
                     },
                     onCompleteOrder = { order ->
                         viewModel.markLabOrderCompleted(order)
@@ -1863,13 +1876,15 @@ private fun AsianBmiSpectrumBar(currentBmi: Double) {
 fun PendingLabOrderCard(
     orders: List<PendingLabOrder>,
     availableTestTypes: List<String>,
-    onSaveOrder: (String, String, String, String, String, String, Boolean) -> Unit,
+    onSaveOrder: (String, String, String, String, String, String, Boolean, String?) -> Unit,
+    onUpdateOrder: (PendingLabOrder) -> Unit,
     onCompleteOrder: (PendingLabOrder) -> Unit,
     onDeleteOrder: (PendingLabOrder) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var isExpanded by remember { mutableStateOf(true) }
     var showScheduleDialog by remember { mutableStateOf(false) }
+    var editingOrder by remember { mutableStateOf<PendingLabOrder?>(null) }
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -2023,7 +2038,8 @@ fun PendingLabOrderCard(
                             PendingLabOrderItemCard(
                                 order = order,
                                 onComplete = { onCompleteOrder(order) },
-                                onDelete = { onDeleteOrder(order) }
+                                onDelete = { onDeleteOrder(order) },
+                                onEdit = { editingOrder = order }
                             )
                         }
 
@@ -2042,13 +2058,33 @@ fun PendingLabOrderCard(
         }
     }
 
-    if (showScheduleDialog) {
+    if (showScheduleDialog || editingOrder != null) {
         ScheduleLabOrderDialog(
             availableTestTypes = availableTestTypes,
-            onDismiss = { showScheduleDialog = false },
-            onSave = { testName, date, time, facility, prep, notes, reminder ->
-                onSaveOrder(testName, date, time, facility, prep, notes, reminder)
+            existingOrder = editingOrder,
+            onDismiss = {
                 showScheduleDialog = false
+                editingOrder = null
+            },
+            onSave = { existing, testName, date, time, facility, prep, notes, reminder, imageUri ->
+                if (existing == null) {
+                    onSaveOrder(testName, date, time, facility, prep, notes, reminder, imageUri)
+                } else {
+                    onUpdateOrder(
+                        existing.copy(
+                            testName = testName.trim(),
+                            scheduledDate = date.trim(),
+                            scheduledTime = time.trim(),
+                            facilityName = facility.trim(),
+                            fastingInstructions = prep.trim(),
+                            notes = notes.trim(),
+                            isReminderEnabled = reminder,
+                            imageUri = imageUri
+                        )
+                    )
+                }
+                showScheduleDialog = false
+                editingOrder = null
             }
         )
     }
@@ -2058,7 +2094,8 @@ fun PendingLabOrderCard(
 private fun PendingLabOrderItemCard(
     order: PendingLabOrder,
     onComplete: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit
 ) {
     val countdown = remember(order.scheduledDate) {
         PendingLabOrderHelper.getCountdownStatus(order.scheduledDate)
@@ -2072,6 +2109,7 @@ private fun PendingLabOrderItemCard(
     val alarmInfo = remember(order.scheduledDate, order.scheduledTime) {
         PendingLabOrderHelper.getAlarmInfoText(order.scheduledDate, order.scheduledTime)
     }
+    var showEnlargedPhoto by remember { mutableStateOf(false) }
 
     Surface(
         shape = RoundedCornerShape(14.dp),
@@ -2188,6 +2226,40 @@ private fun PendingLabOrderItemCard(
                 )
             }
 
+            // Lab order photo thumbnail
+            if (!order.imageUri.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(140.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(10.dp))
+                        .clickable { showEnlargedPhoto = true }
+                ) {
+                    AsyncImage(
+                        model = File(order.imageUri),
+                        contentDescription = "Lab order photo",
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                    Surface(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(8.dp),
+                        shape = RoundedCornerShape(6.dp),
+                        color = Color.Black.copy(alpha = 0.6f)
+                    ) {
+                        Text(
+                            "Tap to view",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
             // 1-Day Alarm Badge
             if (order.isReminderEnabled) {
                 Row(
@@ -2232,6 +2304,18 @@ private fun PendingLabOrderItemCard(
                 }
 
                 IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier.size(34.dp)
+                ) {
+                    Icon(
+                        Icons.Default.EditNote,
+                        contentDescription = "Edit",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                IconButton(
                     onClick = onDelete,
                     modifier = Modifier.size(34.dp)
                 ) {
@@ -2245,13 +2329,22 @@ private fun PendingLabOrderItemCard(
             }
         }
     }
+
+    if (showEnlargedPhoto && !order.imageUri.isNullOrBlank()) {
+        ZoomableImageDialog(
+            imagePath = order.imageUri,
+            title = order.testName,
+            onDismiss = { showEnlargedPhoto = false }
+        )
+    }
 }
 
 @Composable
 private fun ScheduleLabOrderDialog(
     availableTestTypes: List<String>,
+    existingOrder: PendingLabOrder?,
     onDismiss: () -> Unit,
-    onSave: (String, String, String, String, String, String, Boolean) -> Unit
+    onSave: (PendingLabOrder?, String, String, String, String, String, String, Boolean, String?) -> Unit
 ) {
     val context = LocalContext.current
     val calendar = Calendar.getInstance().apply {
@@ -2262,13 +2355,56 @@ private fun ScheduleLabOrderDialog(
         SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(calendar.time)
     }
 
-    var testName by remember { mutableStateOf("") }
-    var scheduledDate by remember { mutableStateOf(defaultDate) }
-    var scheduledTime by remember { mutableStateOf("07:30") }
-    var facilityName by remember { mutableStateOf("") }
-    var fastingInstructions by remember { mutableStateOf("10-12 hours fasting required (water only)") }
-    var notes by remember { mutableStateOf("") }
-    var isReminderEnabled by remember { mutableStateOf(true) }
+    var testName by remember { mutableStateOf(existingOrder?.testName ?: "") }
+    var scheduledDate by remember { mutableStateOf(existingOrder?.scheduledDate ?: defaultDate) }
+    var scheduledTime by remember { mutableStateOf(existingOrder?.scheduledTime ?: "07:30") }
+    var facilityName by remember { mutableStateOf(existingOrder?.facilityName ?: "") }
+    var fastingInstructions by remember { mutableStateOf(existingOrder?.fastingInstructions ?: "10-12 hours fasting required (water only)") }
+    var notes by remember { mutableStateOf(existingOrder?.notes ?: "") }
+    var isReminderEnabled by remember { mutableStateOf(existingOrder?.isReminderEnabled ?: true) }
+    var imageUri by remember { mutableStateOf(existingOrder?.imageUri) }
+
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var tempCameraFile by remember { mutableStateOf<File?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempCameraFile != null) {
+            val savedPath = ImageUtils.saveImageToInternalStorage(context, Uri.fromFile(tempCameraFile))
+            imageUri = savedPath ?: tempCameraFile?.absolutePath
+        }
+    }
+
+    val launchCamera = {
+        val (file, uri) = ImageUtils.createImageFileUri(context)
+        tempCameraFile = file
+        tempCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) launchCamera()
+    }
+
+    val onTakePhotoClick = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchCamera()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val savedPath = ImageUtils.saveImageToInternalStorage(context, uri)
+            imageUri = savedPath ?: uri.toString()
+        }
+    }
 
     val commonSuggestions = listOf(
         "Fasting Blood Sugar (FBS)",
@@ -2320,7 +2456,11 @@ private fun ScheduleLabOrderDialog(
                         )
                     }
                 }
-                Text("Schedule Pending Lab Order", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    if (existingOrder == null) "Schedule Pending Lab Order" else "Edit Pending Lab Order",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
             }
         },
         text = {
@@ -2400,9 +2540,9 @@ private fun ScheduleLabOrderDialog(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(Icons.Default.CalendarToday, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            Column {
-                                Text("Date", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(scheduledDate, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Date", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                Text(scheduledDate, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -2431,9 +2571,9 @@ private fun ScheduleLabOrderDialog(
                             horizontalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
                             Icon(Icons.Default.Schedule, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-                            Column {
-                                Text("Time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Text(PendingLabOrderHelper.formatDisplayTime(scheduledTime), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Time", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                Text(PendingLabOrderHelper.formatDisplayTime(scheduledTime), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
@@ -2491,6 +2631,21 @@ private fun ScheduleLabOrderDialog(
                     minLines = 2
                 )
 
+                // Optional photo attachment
+                Text(
+                    "Lab Order / Requisition Photo (Optional)",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                StatelessImageAttachmentPicker(
+                    imageUri = imageUri,
+                    onClearImage = { imageUri = null },
+                    onTakePhoto = { onTakePhotoClick() },
+                    onPickFromGallery = { galleryLauncher.launch("image/*") },
+                    label = "Attach lab order or requisition form photo"
+                )
+
                 // 1-Day Prior Alarm Switch
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -2525,13 +2680,13 @@ private fun ScheduleLabOrderDialog(
             Button(
                 onClick = {
                     if (testName.isNotBlank() && scheduledDate.isNotBlank()) {
-                        onSave(testName, scheduledDate, scheduledTime, facilityName, fastingInstructions, notes, isReminderEnabled)
+                        onSave(existingOrder, testName, scheduledDate, scheduledTime, facilityName, fastingInstructions, notes, isReminderEnabled, imageUri)
                     }
                 },
                 enabled = testName.isNotBlank() && scheduledDate.isNotBlank(),
                 shape = RoundedCornerShape(10.dp)
             ) {
-                Text("Schedule & Set Alarm", fontWeight = FontWeight.Bold)
+                Text(if (existingOrder == null) "Schedule & Set Alarm" else "Save Changes", fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
