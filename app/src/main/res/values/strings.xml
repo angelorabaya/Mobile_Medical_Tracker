@@ -17,6 +17,17 @@
     <string name="notification_permission_rationale">Allow notifications to receive medicine and lab-test reminders.</string>
     <string name="exact_alarm_permission_rationale">Allow exact alarms so medicine reminders fire at the exact scheduled time.</string>
 
+    <!-- App lock -->
+    <string name="app_lock_title">Unlock VitalsIQ</string>
+    <string name="app_lock_subtitle">Authenticate to view your health data</string>
+
+    <!-- Validation messages -->
+    <string name="error_name_required">Full name is required</string>
+    <string name="error_medication_required">Please enter at least one medication name</string>
+    <string name="error_date_prescribed_required">Date prescribed is required</string>
+    <string name="error_test_required">Please enter at least one test description/name</string>
+    <string name="error_test_date_required">Test date is required</string>
+
     <!-- Alarms -->
     <string name="alarm_permission_grant">Grant access</string>
     <string name="alarm_permission_not_granted">Exact alarm access not granted; reminders may be slightly delayed.</string>

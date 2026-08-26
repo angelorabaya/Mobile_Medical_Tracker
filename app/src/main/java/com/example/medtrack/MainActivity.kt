@@ -2,6 +2,7 @@ package com.example.medtrack
 
 import android.Manifest
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -28,6 +29,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Block screenshots and keep sensitive health data out of the recents
+        // preview, complementing the optional biometric app-lock.
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
 
         val destination = intent.getStringExtra(NotificationHelper.EXTRA_DESTINATION)
         val prescriptionId = if (intent.hasExtra(NotificationHelper.EXTRA_PRESCRIPTION_ID)) {

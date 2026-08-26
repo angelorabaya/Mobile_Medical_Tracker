@@ -84,8 +84,11 @@ class ProfileEditViewModel(application: Application) : AndroidViewModel(applicat
                 return@launch
             }
             val path = runCatching {
+                val exportsDir = File(getApplication<Application>().cacheDir, "exports").apply {
+                    if (!exists()) mkdirs()
+                }
                 val file = File(
-                    getApplication<Application>().cacheDir,
+                    exportsDir,
                     "vitalsiq_export_${System.currentTimeMillis()}.json"
                 )
                 file.writeText(json)

@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <cache-path name="cached_images" path="." />
-    <files-path name="internal_images" path="." />
-    <external-path name="external_files" path="." />
-    <external-cache-path name="external_cache" path="." />
+    <!-- Camera temp captures live in cacheDir/images -->
+    <cache-path name="cached_images" path="images/" />
+    <!-- Persisted attachments live in filesDir/images -->
+    <files-path name="internal_images" path="images/" />
+    <!-- JSON exports live in cacheDir/exports -->
+    <cache-path name="exports" path="exports/" />
 </paths>

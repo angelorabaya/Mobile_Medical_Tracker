@@ -23,7 +23,7 @@ import net.sqlcipher.database.SupportFactory
         BmiRecord::class,
         PendingLabOrder::class
     ],
-    version = 11,
+    version = 12,
     exportSchema = true
 )
 abstract class MedTrackDatabase : RoomDatabase() {
@@ -94,6 +94,13 @@ abstract class MedTrackDatabase : RoomDatabase() {
             }
         }
 
+        /** v11 → v12: add missing index on bmi_records.patientId for filtered queries. */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_bmi_records_patientId` ON `bmi_records` (`patientId`)")
+            }
+        }
+
         @Volatile
         private var INSTANCE: MedTrackDatabase? = null
 
@@ -108,9 +115,11 @@ abstract class MedTrackDatabase : RoomDatabase() {
                     .openHelperFactory(
                         SupportFactory(DbKeyManager.getOrCreatePassphrase(context.applicationContext))
                     )
-                    // Register migrations here as schema versions evolve, e.g.
-                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11)
-                    .fallbackToDestructiveMigration(true)
+                    // Register migrations here as schema versions evolve.
+                    // NOTE: No destructive-migration fallback: silently wiping
+                    // health records is never acceptable, so a failed migration
+                    // throws instead of destroying patient data.
+                    .addMigrations(MIGRATION_8_9, MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12)
                     .build()
                 INSTANCE = instance
                 instance

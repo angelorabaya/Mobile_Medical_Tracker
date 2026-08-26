@@ -57,6 +57,8 @@ object NotificationHelper {
             .addAction(0, context.getString(R.string.notification_snooze), snoozePendingIntent)
             .addAction(0, context.getString(R.string.notification_mark_taken), takenPendingIntent)
             .setAutoCancel(true)
+            // Hide medication details on the lock screen.
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .build()
 
         try {
@@ -89,6 +91,8 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            // Hide medication details on the lock screen.
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .build()
 
         try {
@@ -139,6 +143,8 @@ object NotificationHelper {
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            // Hide lab-test details on the lock screen.
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .build()
 
         try {

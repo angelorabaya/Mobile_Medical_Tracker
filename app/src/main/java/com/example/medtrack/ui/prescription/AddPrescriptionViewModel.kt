@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.medtrack.MedTrackApplication
+import com.example.medtrack.R
 import com.example.medtrack.data.entity.Prescription
 import com.example.medtrack.data.entity.PrescriptionMedication
 import com.example.medtrack.util.FrequencyHelper
@@ -109,11 +110,11 @@ class AddPrescriptionViewModel(application: Application) : AndroidViewModel(appl
     fun savePrescription(onComplete: () -> Unit) {
         val validMeds = medications.filter { it.name.isNotBlank() }
         if (validMeds.isEmpty()) {
-            errorMessage = "Please enter at least one medication name"
+            errorMessage = getApplication<Application>().getString(R.string.error_medication_required)
             return
         }
         if (datePrescribed.isBlank()) {
-            errorMessage = "Date prescribed is required"
+            errorMessage = getApplication<Application>().getString(R.string.error_date_prescribed_required)
             return
         }
         errorMessage = null

@@ -51,6 +51,11 @@ fun ImageAttachmentPicker(
             } else {
                 onImageSelected(tempCameraFile?.absolutePath)
             }
+            // The camera writes into a cache temp file; remove it now that it has
+            // been copied (or failed) so the cache doesn't accumulate orphans.
+            tempCameraFile?.delete()
+            tempCameraFile = null
+            tempCameraUri = null
         }
     }
 

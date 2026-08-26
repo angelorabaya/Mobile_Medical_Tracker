@@ -18,12 +18,11 @@ import com.example.medtrack.data.repository.ReminderRepository
 class AppContainer(context: Context) {
     private val database = MedTrackDatabase.getDatabase(context)
 
-    val patientRepository = PatientRepository(database.patientDao(), context)
-    val labTestRepository = LabTestRepository(database.labTestDao(), context)
+    val patientRepository = PatientRepository(database.patientDao())
+    val labTestRepository = LabTestRepository(database.labTestDao())
     val prescriptionRepository = PrescriptionRepository(
         database.prescriptionDao(),
-        database.medicineReminderDao(),
-        context
+        database.medicineReminderDao()
     )
     val reminderRepository = ReminderRepository(database.medicineReminderDao())
     val labTestTypeRepository = LabTestTypeRepository(database.labTestTypeDao())

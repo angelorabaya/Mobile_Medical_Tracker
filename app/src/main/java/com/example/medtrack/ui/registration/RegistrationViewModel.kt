@@ -7,6 +7,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.medtrack.MedTrackApplication
+import com.example.medtrack.R
 import com.example.medtrack.data.entity.Patient
 import kotlinx.coroutines.launch
 
@@ -27,7 +28,7 @@ class RegistrationViewModel(application: Application) : AndroidViewModel(applica
 
     fun savePatient(onComplete: () -> Unit) {
         if (fullName.isBlank()) {
-            errorMessage = "Full name is required"
+            errorMessage = getApplication<Application>().getString(R.string.error_name_required)
             return
         }
         errorMessage = null

@@ -5,6 +5,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.example.medtrack.R
 
 /**
  * Optional app-lock using the device biometric (or device credential) prompt.
@@ -33,7 +34,7 @@ object AppLockManager {
     /** True when biometric or device-credential authentication is usable. */
     fun isAvailable(context: Context): Boolean {
         val result = BiometricManager.from(context).canAuthenticate(
-            BiometricManager.Authenticators.BIOMETRIC_WEAK or
+            BiometricManager.Authenticators.BIOMETRIC_STRONG or
                 BiometricManager.Authenticators.DEVICE_CREDENTIAL
         )
         return result == BiometricManager.BIOMETRIC_SUCCESS
@@ -58,10 +59,10 @@ object AppLockManager {
         )
 
         val info = BiometricPrompt.PromptInfo.Builder()
-            .setTitle("Unlock VitalsIQ")
-            .setSubtitle("Authenticate to view your health data")
+            .setTitle(activity.getString(R.string.app_lock_title))
+            .setSubtitle(activity.getString(R.string.app_lock_subtitle))
             .setAllowedAuthenticators(
-                BiometricManager.Authenticators.BIOMETRIC_WEAK or
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
                     BiometricManager.Authenticators.DEVICE_CREDENTIAL
             )
             .build()

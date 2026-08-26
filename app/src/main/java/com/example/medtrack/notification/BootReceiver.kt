@@ -42,8 +42,12 @@ class BootReceiver : BroadcastReceiver() {
 
     companion object {
         val RESCHEDULE_ACTIONS = setOf(
+            // NOTE: LOCKED_BOOT_COMPLETED is intentionally NOT handled here. The
+            // database and key are protected by credential-encrypted storage, so
+            // they are unreadable while the device is locked. BOOT_COMPLETED is
+            // delivered once the user unlocks, at which point we can safely read
+            // the DB and reschedule alarms.
             Intent.ACTION_BOOT_COMPLETED,
-            Intent.ACTION_LOCKED_BOOT_COMPLETED,
             Intent.ACTION_MY_PACKAGE_REPLACED,
             Intent.ACTION_TIME_CHANGED,
             Intent.ACTION_TIMEZONE_CHANGED,

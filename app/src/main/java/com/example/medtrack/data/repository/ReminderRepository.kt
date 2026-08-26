@@ -1,6 +1,7 @@
 package com.example.medtrack.data.repository
 
 import com.example.medtrack.data.dao.MedicineReminderDao
+import com.example.medtrack.data.dao.ReminderWithMedicationName
 import com.example.medtrack.data.entity.MedicineReminder
 import kotlinx.coroutines.flow.Flow
 
@@ -9,6 +10,10 @@ class ReminderRepository(
 ) {
     fun getRemindersByPrescription(prescriptionId: Int): Flow<List<MedicineReminder>> =
         medicineReminderDao.getRemindersByPrescription(prescriptionId)
+
+    /** All reminders with their display medication name, resolved in a single join. */
+    fun getRemindersWithMedicationName(): Flow<List<ReminderWithMedicationName>> =
+        medicineReminderDao.getRemindersWithMedicationName()
 
     suspend fun getReminderById(id: Int): MedicineReminder? =
         medicineReminderDao.getReminderById(id)

@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.medtrack.MedTrackApplication
+import com.example.medtrack.R
 import com.example.medtrack.data.entity.LabTest
 import com.example.medtrack.data.entity.LabTestItem
 import com.example.medtrack.data.entity.LabTestType
@@ -203,11 +204,11 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
     fun saveLabTest(onComplete: () -> Unit) {
         val validItems = items.filter { it.testName.isNotBlank() }
         if (validItems.isEmpty()) {
-            errorMessage = "Please enter at least one test description/name"
+            errorMessage = getApplication<Application>().getString(R.string.error_test_required)
             return
         }
         if (testDate.isBlank()) {
-            errorMessage = "Test date is required"
+            errorMessage = getApplication<Application>().getString(R.string.error_test_date_required)
             return
         }
         errorMessage = null

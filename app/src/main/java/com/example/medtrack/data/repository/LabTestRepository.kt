@@ -1,6 +1,5 @@
 package com.example.medtrack.data.repository
 
-import android.content.Context
 import com.example.medtrack.data.dao.LabTestDao
 import com.example.medtrack.data.entity.LabTest
 import com.example.medtrack.data.entity.LabTestItem
@@ -9,8 +8,7 @@ import com.example.medtrack.util.ImageUtils
 import kotlinx.coroutines.flow.Flow
 
 class LabTestRepository(
-    private val labTestDao: LabTestDao,
-    private val context: Context
+    private val labTestDao: LabTestDao
 ) {
     fun getLabTestsWithItems(patientId: Int): Flow<List<LabTestWithItems>> =
         labTestDao.getLabTestsWithItems(patientId)

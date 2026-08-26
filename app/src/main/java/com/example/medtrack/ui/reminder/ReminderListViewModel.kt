@@ -19,17 +19,11 @@ class ReminderListViewModel(application: Application) : AndroidViewModel(applica
     private val container = app.container
 
     val remindersWithMeds: StateFlow<List<ReminderWithMedName>> = container.reminderRepository
-        .getAllReminders()
-        .map { reminders ->
-            reminders.mapNotNull { reminder ->
-                val medName = if (reminder.label.isNotBlank()) {
-                    reminder.label
-                } else {
-                    val rxWithMeds = container.prescriptionRepository.getPrescriptionWithMedicationsByIdOnce(reminder.prescriptionId)
-                    rxWithMeds?.displayTitle ?: "Prescription"
-                }
-                ReminderWithMedName(reminder, medName)
-            }
+        .getRemindersWithMedicationName()
+        .map { list ->
+            // The medication name (label, else prescription title) is resolved in
+            // a single SQL join instead of one DB query per reminder (N+1).
+            list.map { ReminderWithMedName(it.reminder, it.medicationName) }
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

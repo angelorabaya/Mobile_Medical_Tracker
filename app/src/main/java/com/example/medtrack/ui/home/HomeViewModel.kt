@@ -10,6 +10,7 @@ import com.example.medtrack.data.entity.PendingLabOrder
 import com.example.medtrack.notification.ReminderScheduler
 import com.example.medtrack.util.LabComparisonHelper
 import com.example.medtrack.util.LabTestComparison
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -42,6 +43,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         .map { testsWithItems ->
             LabComparisonHelper.generateComparativePanels(testsWithItems)
         }
+        // Comparison generation is CPU/regex heavy; keep it off the main thread.
+        .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)

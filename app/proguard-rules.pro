@@ -34,6 +34,3 @@
 # Coil (image loading)
 # ---------------------------------------------------------------------------
 -dontwarn coil.**
-
-# Keep any classes instantiated reflectively by the app
--keep class com.example.medtrack.** { *; }

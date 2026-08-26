@@ -34,6 +34,12 @@ android {
       shaders = false
     }
 
+    // Expose exported Room schemas to the instrumented tests so MigrationTestHelper
+    // can create databases at older versions and validate each migration.
+    sourceSets {
+        getByName("androidTest").assets.srcDirs("$projectDir/schemas")
+    }
+
     packaging {
       resources {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
@@ -95,6 +101,7 @@ dependencies {
   implementation(libs.room.runtime)
   implementation(libs.room.ktx)
   ksp(libs.room.compiler)
+  androidTestImplementation(libs.room.testing)
 
   // Security: biometric app-lock and SQLCipher encryption-at-rest
   implementation(libs.androidx.biometric)

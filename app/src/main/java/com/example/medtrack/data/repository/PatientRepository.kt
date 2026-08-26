@@ -1,14 +1,12 @@
 package com.example.medtrack.data.repository
 
-import android.content.Context
 import com.example.medtrack.data.dao.PatientDao
 import com.example.medtrack.data.entity.Patient
 import com.example.medtrack.util.ImageUtils
 import kotlinx.coroutines.flow.Flow
 
 class PatientRepository(
-    private val patientDao: PatientDao,
-    private val context: Context
+    private val patientDao: PatientDao
 ) {
     fun getPatient(): Flow<Patient?> = patientDao.getPatient()
 

@@ -1,6 +1,5 @@
 package com.example.medtrack.data.repository
 
-import android.content.Context
 import com.example.medtrack.data.dao.MedicineReminderDao
 import com.example.medtrack.data.dao.PrescriptionDao
 import com.example.medtrack.data.entity.Prescription
@@ -11,8 +10,7 @@ import kotlinx.coroutines.flow.Flow
 
 class PrescriptionRepository(
     private val prescriptionDao: PrescriptionDao,
-    private val medicineReminderDao: MedicineReminderDao,
-    private val context: Context
+    private val medicineReminderDao: MedicineReminderDao
 ) {
     fun getPrescriptionsWithMedications(patientId: Int): Flow<List<PrescriptionWithMedications>> =
         prescriptionDao.getPrescriptionsWithMedications(patientId)

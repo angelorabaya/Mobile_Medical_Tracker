@@ -12,7 +12,6 @@ import com.example.medtrack.data.entity.Prescription
 import com.example.medtrack.data.entity.PrescriptionMedication
 import com.example.medtrack.data.entity.PrescriptionWithMedications
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -26,14 +25,19 @@ import org.json.JSONObject
  */
 class DataExporter(private val container: AppContainer) {
 
+    companion object {
+        const val EXPORT_FORMAT = "vitalsiq"
+        const val EXPORT_VERSION = 1
+    }
+
     // ------------------------------------------------------------------
     // Export
     // ------------------------------------------------------------------
 
     suspend fun exportJson(): String = withContext(Dispatchers.IO) {
         val root = JSONObject()
-        root.put("format", "vitalsiq")
-        root.put("version", 1)
+        root.put("format", EXPORT_FORMAT)
+        root.put("version", EXPORT_VERSION)
 
         container.patientRepository.getPatientOnce()?.let { p ->
             root.put("patient", patientJson(p))
@@ -45,9 +49,15 @@ class DataExporter(private val container: AppContainer) {
         }
         root.put("labTests", labTests)
 
+        // Fetch all reminders once and group by prescription to avoid N+1 queries.
+        val remindersByPrescription = container.reminderRepository.getAllRemindersOnce()
+            .groupBy { it.prescriptionId }
+
         val prescriptions = JSONArray()
         container.prescriptionRepository.getAllPrescriptionsWithMedicationsOnce().forEach { p ->
-            prescriptions.put(prescriptionJson(p))
+            prescriptions.put(
+                prescriptionJson(p, remindersByPrescription[p.prescription.id].orEmpty())
+            )
         }
         root.put("prescriptions", prescriptions)
 
@@ -104,7 +114,10 @@ class DataExporter(private val container: AppContainer) {
         put("items", items)
     }
 
-    private suspend fun prescriptionJson(p: PrescriptionWithMedications) = JSONObject().apply {
+    private fun prescriptionJson(
+        p: PrescriptionWithMedications,
+        reminders: List<MedicineReminder>
+    ) = JSONObject().apply {
         put("title", p.prescription.title)
         put("doctorName", p.prescription.doctorName)
         put("datePrescribed", p.prescription.datePrescribed)
@@ -126,13 +139,11 @@ class DataExporter(private val container: AppContainer) {
         put("medications", meds)
 
         // Nest reminders so prescription->reminder mapping survives a re-import.
-        val reminders = JSONArray()
-        container.reminderRepository.getRemindersByPrescription(p.prescription.id)
-            .first()
-            .forEach { r ->
-                reminders.put(reminderJson(r))
-            }
-        put("reminders", reminders)
+        val remindersJson = JSONArray()
+        reminders.forEach { r ->
+            remindersJson.put(reminderJson(r))
+        }
+        put("reminders", remindersJson)
     }
 
     private fun reminderJson(r: MedicineReminder) = JSONObject().apply {
@@ -177,6 +188,17 @@ class DataExporter(private val container: AppContainer) {
     suspend fun importJson(json: String) = withContext(Dispatchers.IO) {
         val root = JSONObject(json)
 
+        // Validate the backup before touching any data so a foreign or malformed
+        // file can never wipe the current record.
+        if (root.optString("format", "unknown") != EXPORT_FORMAT) {
+            throw IllegalArgumentException("Unsupported backup format: ${root.optString("format")}")
+        }
+
+        // Snapshot existing image files so files orphaned by the restore can be
+        // cleaned up afterwards (the backup embeds paths but not the binaries).
+        val oldImagePaths = collectAllImagePaths()
+        val newImagePaths = mutableSetOf<String>()
+
         // Full restore: clear current data first (patient FK cascade removes
         // dependent lab tests, prescriptions, medications, reminders, BMI and
         // pending orders; lab test types are independent).
@@ -200,6 +222,7 @@ class DataExporter(private val container: AppContainer) {
                 )
             )
             patientId = id.toInt()
+            p.optString("photoUri").takeIf { it.isNotBlank() }?.let(newImagePaths::add)
         }
 
         // Lab tests (with items)
@@ -216,6 +239,7 @@ class DataExporter(private val container: AppContainer) {
                 imageUri = t.optString("imageUri").ifBlank { null },
                 createdAt = t.optLong("createdAt", System.currentTimeMillis())
             )
+            t.optString("imageUri").takeIf { it.isNotBlank() }?.let(newImagePaths::add)
             val itemsJson = t.optJSONArray("items") ?: JSONArray()
             val items = mutableListOf<LabTestItem>()
             for (j in 0 until itemsJson.length()) {
@@ -248,6 +272,7 @@ class DataExporter(private val container: AppContainer) {
                 isActive = p.optBoolean("isActive", true),
                 createdAt = p.optLong("createdAt", System.currentTimeMillis())
             )
+            p.optString("imageUri").takeIf { it.isNotBlank() }?.let(newImagePaths::add)
             val medsJson = p.optJSONArray("medications") ?: JSONArray()
             val meds = mutableListOf<PrescriptionMedication>()
             for (j in 0 until medsJson.length()) {
@@ -316,6 +341,7 @@ class DataExporter(private val container: AppContainer) {
                     createdAt = o.optLong("createdAt", System.currentTimeMillis())
                 )
             )
+            o.optString("imageUri").takeIf { it.isNotBlank() }?.let(newImagePaths::add)
         }
 
         // Lab test types
@@ -336,5 +362,28 @@ class DataExporter(private val container: AppContainer) {
             }
             container.labTestTypeRepository.insertAll(typeList)
         }
+
+        // Restore succeeded: purge image files that are no longer referenced by
+        // any record (but keep any that the new data still points to).
+        oldImagePaths
+            .filterNot { it in newImagePaths }
+            .forEach { ImageUtils.deleteImageFile(it) }
+    }
+
+    /** Collects every image path currently referenced in the database. */
+    private suspend fun collectAllImagePaths(): List<String> {
+        val paths = mutableListOf<String>()
+        container.patientRepository.getPatientOnce()?.photoUri
+            ?.takeIf { it.isNotBlank() }?.let(paths::add)
+        container.labTestRepository.getAllLabTestsWithItemsOnce().forEach { t ->
+            t.labTest.imageUri?.takeIf { it.isNotBlank() }?.let(paths::add)
+        }
+        container.prescriptionRepository.getAllPrescriptionsWithMedicationsOnce().forEach { p ->
+            p.prescription.imageUri?.takeIf { it.isNotBlank() }?.let(paths::add)
+        }
+        container.pendingLabOrderRepository.getAllOrdersOnce().forEach { o ->
+            o.imageUri?.takeIf { it.isNotBlank() }?.let(paths::add)
+        }
+        return paths
     }
 }

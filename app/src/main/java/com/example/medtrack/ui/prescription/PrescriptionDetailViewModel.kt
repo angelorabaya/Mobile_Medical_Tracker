@@ -27,34 +27,6 @@ class PrescriptionDetailViewModel(
         .getRemindersByPrescription(prescriptionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    init {
-        viewModelScope.launch {
-            val current = container.prescriptionRepository.getPrescriptionWithMedicationsByIdOnce(prescriptionId)
-            current?.medications?.forEach { med ->
-                var updatedMed = med
-                if (med.medicationName.contains("Atorvasta", ignoreCase = true)) {
-                    updatedMed = updatedMed.copy(
-                        medicationName = "Atorvastatin",
-                        frequency = if (med.frequency.contains("0-0-1") || med.frequency.contains("1-0-1")) med.frequency else "0-0-1 (Evening / Bedtime only)"
-                    )
-                } else if (med.medicationName.contains("Liver Prime", ignoreCase = true)) {
-                    updatedMed = updatedMed.copy(
-                        medicationName = "Liver Prime HD",
-                        frequency = if (med.frequency.contains("-")) med.frequency else "1-0-0 (Morning only)"
-                    )
-                } else if (med.medicationName.contains("Febuxostat", ignoreCase = true)) {
-                    updatedMed = updatedMed.copy(
-                        medicationName = "Febuxostat",
-                        frequency = if (med.frequency.contains("-")) med.frequency else "0-0-1 (Evening / Bedtime only)"
-                    )
-                }
-                if (updatedMed != med) {
-                    container.prescriptionRepository.updateMedication(updatedMed)
-                }
-            }
-        }
-    }
-
     fun toggleStatus() {
         viewModelScope.launch {
             val current = container.prescriptionRepository.getPrescriptionByIdOnce(prescriptionId) ?: return@launch
