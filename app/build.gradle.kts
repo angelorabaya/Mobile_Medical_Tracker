@@ -18,7 +18,8 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
@@ -29,7 +30,7 @@ android {
     buildFeatures {
       compose = true
       aidl = false
-      buildConfig = false
+      buildConfig = true
       shaders = false
     }
 
@@ -38,6 +39,11 @@ android {
         excludes += "/META-INF/{AL2.0,LGPL2.1}"
       }
     }
+}
+
+ksp {
+    // Export Room schemas to allow writing & testing proper migrations.
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 kotlin {
@@ -89,4 +95,9 @@ dependencies {
   implementation(libs.room.runtime)
   implementation(libs.room.ktx)
   ksp(libs.room.compiler)
+
+  // Security: biometric app-lock and SQLCipher encryption-at-rest
+  implementation(libs.androidx.biometric)
+  implementation(libs.sqlcipher)
+  implementation(libs.androidx.sqlite.ktx)
 }

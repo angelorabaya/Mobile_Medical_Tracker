@@ -12,12 +12,12 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class LabTestListViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = (application as MedTrackApplication).database
+    private val container = (application as MedTrackApplication).container
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val labTestsWithItems: StateFlow<List<LabTestWithItems>> = db.patientDao().getPatient()
+    val labTestsWithItems: StateFlow<List<LabTestWithItems>> = container.patientRepository.getPatient()
         .flatMapLatest { patient ->
-            if (patient != null) db.labTestDao().getLabTestsWithItems(patient.id)
+            if (patient != null) container.labTestRepository.getLabTestsWithItems(patient.id)
             else flowOf(emptyList())
         }
         .map { list ->
@@ -35,7 +35,7 @@ class LabTestListViewModel(application: Application) : AndroidViewModel(applicat
 
     fun deleteLabTest(labTest: LabTest) {
         viewModelScope.launch {
-            db.labTestDao().delete(labTest)
+            container.labTestRepository.delete(labTest)
         }
     }
 }

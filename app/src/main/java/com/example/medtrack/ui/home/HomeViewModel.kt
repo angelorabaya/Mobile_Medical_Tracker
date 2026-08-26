@@ -15,29 +15,29 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = (application as MedTrackApplication).database
+    private val container = (application as MedTrackApplication).container
 
-    val patient: StateFlow<Patient?> = db.patientDao().getPatient()
+    val patient: StateFlow<Patient?> = container.patientRepository.getPatient()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val labTestCount: StateFlow<Int> = patient
         .flatMapLatest { p ->
-            if (p != null) db.labTestDao().getLabTestCount(p.id) else flowOf(0)
+            if (p != null) container.labTestRepository.getLabTestCount(p.id) else flowOf(0)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val activePrescriptionCount: StateFlow<Int> = patient
         .flatMapLatest { p ->
-            if (p != null) db.prescriptionDao().getActivePrescriptionCount(p.id) else flowOf(0)
+            if (p != null) container.prescriptionRepository.getActivePrescriptionCount(p.id) else flowOf(0)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val comparativeLabPanels: StateFlow<List<LabTestComparison>> = patient
         .flatMapLatest { p ->
-            if (p != null) db.labTestDao().getLabTestsWithItems(p.id) else flowOf(emptyList())
+            if (p != null) container.labTestRepository.getLabTestsWithItems(p.id) else flowOf(emptyList())
         }
         .map { testsWithItems ->
             LabComparisonHelper.generateComparativePanels(testsWithItems)
@@ -47,25 +47,25 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
     @OptIn(ExperimentalCoroutinesApi::class)
     val latestBmiRecord: StateFlow<BmiRecord?> = patient
         .flatMapLatest { p ->
-            if (p != null) db.bmiRecordDao().getLatestBmiRecordForPatient(p.id) else flowOf(null)
+            if (p != null) container.bmiRepository.getLatestBmiRecordForPatient(p.id) else flowOf(null)
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val pendingLabOrders: StateFlow<List<PendingLabOrder>> = patient
         .flatMapLatest { p ->
-            if (p != null) db.pendingLabOrderDao().getPendingOrdersForPatient(p.id) else flowOf(emptyList())
+            if (p != null) container.pendingLabOrderRepository.getPendingOrdersForPatient(p.id) else flowOf(emptyList())
         }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val availableLabTestTypes: StateFlow<List<String>> = db.labTestTypeDao().getAllTestTypes()
+    val availableLabTestTypes: StateFlow<List<String>> = container.labTestTypeRepository.getAllTestTypes()
         .map { list -> list.map { it.name } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun saveBmiRecord(weightKg: Double, heightCm: Double, bmi: Double, category: String) {
         val currentPatientId = patient.value?.id ?: 0
         viewModelScope.launch {
-            db.bmiRecordDao().insert(
+            container.bmiRepository.insert(
                 BmiRecord(
                     patientId = currentPatientId,
                     weightKg = weightKg,
@@ -99,7 +99,7 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 notes = notes.trim(),
                 isReminderEnabled = isReminderEnabled
             )
-            val id = db.pendingLabOrderDao().insert(order).toInt()
+            val id = container.pendingLabOrderRepository.insert(order).toInt()
             val insertedOrder = order.copy(id = id)
             if (isReminderEnabled) {
                 ReminderScheduler.scheduleLabOrderReminder(getApplication(), insertedOrder)
@@ -109,14 +109,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     fun markLabOrderCompleted(order: PendingLabOrder) {
         viewModelScope.launch {
-            db.pendingLabOrderDao().markAsCompleted(order.id)
+            container.pendingLabOrderRepository.markAsCompleted(order.id)
             ReminderScheduler.cancelLabOrderReminder(getApplication(), order.id)
         }
     }
 
     fun deletePendingLabOrder(order: PendingLabOrder) {
         viewModelScope.launch {
-            db.pendingLabOrderDao().delete(order)
+            container.pendingLabOrderRepository.delete(order)
             ReminderScheduler.cancelLabOrderReminder(getApplication(), order.id)
         }
     }

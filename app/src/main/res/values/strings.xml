@@ -1,3 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">VitalsIQ</string>
+
+    <!-- Notifications -->
+    <string name="notification_channel_med_reminders">Medicine Reminders</string>
+    <string name="notification_channel_med_reminders_desc">Reminders to take your medicine</string>
+    <string name="notification_channel_lab_orders">Lab Test Reminders</string>
+    <string name="notification_channel_lab_orders_desc">Alerts for upcoming scheduled laboratory tests (1 day before)</string>
+    <string name="notification_med_title">Time to take your medicine</string>
+    <string name="notification_snooze">Snooze 10 min</string>
+    <string name="notification_mark_taken">Mark taken</string>
+    <string name="notification_snoozed">Snoozed reminder</string>
+    <string name="notification_lab_title">Upcoming Lab Test Tomorrow</string>
+
+    <!-- Permissions -->
+    <string name="notification_permission_rationale">Allow notifications to receive medicine and lab-test reminders.</string>
+    <string name="exact_alarm_permission_rationale">Allow exact alarms so medicine reminders fire at the exact scheduled time.</string>
+
+    <!-- Alarms -->
+    <string name="alarm_permission_grant">Grant access</string>
+    <string name="alarm_permission_not_granted">Exact alarm access not granted; reminders may be slightly delayed.</string>
+
+    <!-- Export -->
+    <string name="export_title">Export health data</string>
+    <string name="export_shared_label">VitalsIQ health data</string>
 </resources>

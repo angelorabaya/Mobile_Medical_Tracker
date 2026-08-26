@@ -38,6 +38,7 @@ fun PrescriptionDetailScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     viewModel: PrescriptionDetailViewModel = viewModel(
+        key = "PrescriptionDetail_$prescriptionId",
         factory = PrescriptionDetailViewModel.factory(prescriptionId)
     )
 ) {

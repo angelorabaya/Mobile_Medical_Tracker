@@ -1,5 +1,11 @@
 package com.example.medtrack.ui.labtest
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import java.io.File
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -12,14 +18,18 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.medtrack.data.entity.LabTestType
 import com.example.medtrack.ui.components.CategoryBadge
 import com.example.medtrack.ui.components.ImageAttachmentPicker
+import com.example.medtrack.ui.components.StatelessImageAttachmentPicker
 import com.example.medtrack.ui.labtest.components.ManageLabTestTypesDialog
+import com.example.medtrack.util.ImageUtils
 import com.example.medtrack.util.LabResultEvaluator
 import com.example.medtrack.util.LabResultStatus
 
@@ -35,6 +45,60 @@ fun AddLabTestScreen(
 
     LaunchedEffect(Unit) {
         viewModel.resetState()
+    }
+
+    val context = LocalContext.current
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var tempCameraFile by remember { mutableStateOf<File?>(null) }
+
+    var photoTargetType by remember { mutableStateOf<String?>(null) } // "parent"
+
+    val handleImageSelected = { path: String? ->
+        if (photoTargetType == "parent") {
+            viewModel.imageUri = path
+        }
+        photoTargetType = null
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempCameraFile != null) {
+            val savedPath = ImageUtils.saveImageToInternalStorage(context, Uri.fromFile(tempCameraFile))
+            handleImageSelected(savedPath ?: tempCameraFile?.absolutePath)
+        }
+    }
+
+    val launchCamera = {
+        val (file, uri) = ImageUtils.createImageFileUri(context)
+        tempCameraFile = file
+        tempCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchCamera()
+        }
+    }
+
+    val onTakePhotoClick = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchCamera()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val savedPath = ImageUtils.saveImageToInternalStorage(context, uri)
+            handleImageSelected(savedPath ?: uri.toString())
+        }
     }
 
     Scaffold(
@@ -230,9 +294,17 @@ fun AddLabTestScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
 
-                    ImageAttachmentPicker(
+                    StatelessImageAttachmentPicker(
                         imageUri = viewModel.imageUri,
-                        onImageSelected = { viewModel.imageUri = it },
+                        onClearImage = { viewModel.imageUri = null },
+                        onTakePhoto = {
+                            photoTargetType = "parent"
+                            onTakePhotoClick()
+                        },
+                        onPickFromGallery = {
+                            photoTargetType = "parent"
+                            galleryLauncher.launch("image/*")
+                        },
                         label = "Attach photo of lab report, scan, or requisition sheet"
                     )
                 }

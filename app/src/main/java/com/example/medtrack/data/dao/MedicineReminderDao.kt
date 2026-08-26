@@ -18,6 +18,9 @@ interface MedicineReminderDao {
     @Query("SELECT * FROM medicine_reminders ORDER BY reminderTime ASC")
     fun getAllReminders(): Flow<List<MedicineReminder>>
 
+    @Query("SELECT * FROM medicine_reminders")
+    suspend fun getAllRemindersOnce(): List<MedicineReminder>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(reminder: MedicineReminder): Long
 

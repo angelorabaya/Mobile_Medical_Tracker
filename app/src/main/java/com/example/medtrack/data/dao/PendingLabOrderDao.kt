@@ -23,6 +23,9 @@ interface PendingLabOrderDao {
     @Query("SELECT * FROM pending_lab_orders WHERE isCompleted = 0 AND isReminderEnabled = 1")
     suspend fun getAllActiveReminderOrders(): List<PendingLabOrder>
 
+    @Query("SELECT * FROM pending_lab_orders")
+    suspend fun getAllOrdersOnce(): List<PendingLabOrder>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(order: PendingLabOrder): Long
 

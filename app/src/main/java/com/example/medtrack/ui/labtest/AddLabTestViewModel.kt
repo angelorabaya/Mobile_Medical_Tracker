@@ -29,7 +29,7 @@ data class LabTestItemInput(
 )
 
 class AddLabTestViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = (application as MedTrackApplication).database
+    private val container = (application as MedTrackApplication).container
 
     val categoryOptions = listOf(
         "Blood Work",
@@ -40,7 +40,7 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
         "Other"
     )
 
-    val testTypes: StateFlow<List<LabTestType>> = db.labTestTypeDao()
+    val testTypes: StateFlow<List<LabTestType>> = container.labTestTypeRepository
         .getAllTestTypes()
         .stateIn(
             scope = viewModelScope,
@@ -85,16 +85,16 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
                 LabTestType(name = "Serum Electrolytes (Na, K, Cl)", defaultCategory = "Blood Work", defaultNormalRange = "Na: 135-145, K: 3.5-5.0, Cl: 96-106 mEq/L", isDefault = true)
             )
 
-            val existing = db.labTestTypeDao().getAllTestTypesOnce()
+            val existing = container.labTestTypeRepository.getAllTestTypesOnce()
             if (existing.isEmpty()) {
-                db.labTestTypeDao().insertAll(defaults)
+                container.labTestTypeRepository.insertAll(defaults)
             } else {
                 // Delete legacy combined Lipid Profile entry if present
                 val oldCombined = existing.filter {
                     it.name.contains("Lipid Profile (", ignoreCase = true) || it.name.equals("Lipid Profile", ignoreCase = true)
                 }
                 for (old in oldCombined) {
-                    db.labTestTypeDao().delete(old)
+                    container.labTestTypeRepository.delete(old)
                 }
                 // Insert any missing itemized lipid profile options
                 val lipidItems = defaults.filter { it.name.startsWith("Lipid Profile -") }
@@ -102,7 +102,7 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
                     existing.none { it.name.equals(item.name, ignoreCase = true) }
                 }
                 if (toInsert.isNotEmpty()) {
-                    db.labTestTypeDao().insertAll(toInsert)
+                    container.labTestTypeRepository.insertAll(toInsert)
                 }
             }
         }
@@ -167,7 +167,7 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
                 defaultNormalRange = defaultRange.trim(),
                 isDefault = false
             )
-            val id = db.labTestTypeDao().insert(newType)
+            val id = container.labTestTypeRepository.insert(newType)
             val createdType = newType.copy(id = id.toInt())
             onComplete?.invoke(createdType)
         }
@@ -176,14 +176,14 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
     fun updateTestType(type: LabTestType, onComplete: (() -> Unit)? = null) {
         if (type.name.isBlank()) return
         viewModelScope.launch {
-            db.labTestTypeDao().update(type.copy(name = type.name.trim(), defaultNormalRange = type.defaultNormalRange.trim()))
+            container.labTestTypeRepository.update(type.copy(name = type.name.trim(), defaultNormalRange = type.defaultNormalRange.trim()))
             onComplete?.invoke()
         }
     }
 
     fun deleteTestType(type: LabTestType, onComplete: (() -> Unit)? = null) {
         viewModelScope.launch {
-            db.labTestTypeDao().delete(type)
+            container.labTestTypeRepository.delete(type)
             onComplete?.invoke()
         }
     }
@@ -212,7 +212,7 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
         }
         errorMessage = null
         viewModelScope.launch {
-            val patient = db.patientDao().getPatientOnce() ?: return@launch
+            val patient = container.patientRepository.getPatientOnce() ?: return@launch
             val labTest = LabTest(
                 patientId = patient.id,
                 title = title.trim(),
@@ -234,7 +234,7 @@ class AddLabTestViewModel(application: Application) : AndroidViewModel(applicati
                 )
             }
 
-            db.labTestDao().insertLabTestWithItems(labTest, labTestItems)
+            container.labTestRepository.insertLabTestWithItems(labTest, labTestItems)
             withContext(Dispatchers.Main) {
                 resetState()
                 onComplete()

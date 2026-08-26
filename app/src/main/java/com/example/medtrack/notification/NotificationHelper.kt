@@ -11,33 +11,98 @@ import com.example.medtrack.R
 
 object NotificationHelper {
 
+    // Deep-link extras used by MainActivity to route notification taps.
+    const val EXTRA_DESTINATION = "com.example.medtrack.EXTRA_DESTINATION"
+    const val EXTRA_PRESCRIPTION_ID = "com.example.medtrack.EXTRA_PRESCRIPTION_ID"
+    const val DEST_HOME = "home"
+    const val DEST_REMINDERS = "reminders"
+    const val DEST_LAB_TESTS = "lab_tests"
+    const val DEST_PRESCRIPTION = "prescription"
+
     fun showReminderNotification(
         context: Context,
         reminderId: Int,
         medicationName: String,
         reminderTime: String
     ) {
-        val intent = Intent(context, MainActivity::class.java).apply {
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(EXTRA_DESTINATION, DEST_REMINDERS)
         }
         val pendingIntent = PendingIntent.getActivity(
-            context, reminderId, intent,
+            context, reminderId, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val snoozePendingIntent = PendingIntent.getBroadcast(
+            context,
+            reminderId,
+            ReminderActionReceiver.snoozeIntent(context, reminderId, medicationName, reminderTime),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val takenPendingIntent = PendingIntent.getBroadcast(
+            context,
+            reminderId + 100000,
+            ReminderActionReceiver.markTakenIntent(context, reminderId),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(context, MedTrackApplication.REMINDER_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("Time to take your medicine")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notification_med_title))
             .setContentText("$medicationName - $reminderTime")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(pendingIntent)
+            .addAction(0, context.getString(R.string.notification_snooze), snoozePendingIntent)
+            .addAction(0, context.getString(R.string.notification_mark_taken), takenPendingIntent)
             .setAutoCancel(true)
             .build()
 
         try {
             NotificationManagerCompat.from(context).notify(reminderId, notification)
         } catch (e: SecurityException) {
-            // Permission not granted
+            // Notification permission not granted.
+        }
+    }
+
+    fun showSnoozedNotification(
+        context: Context,
+        reminderId: Int,
+        medicationName: String,
+        reminderTime: String
+    ) {
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(EXTRA_DESTINATION, DEST_REMINDERS)
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, reminderId, launchIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, MedTrackApplication.REMINDER_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.notification_snoozed))
+            .setContentText("$medicationName - $reminderTime")
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+
+        try {
+            NotificationManagerCompat.from(context).notify(reminderId + 1000, notification)
+        } catch (e: SecurityException) {
+            // Notification permission not granted.
+        }
+    }
+
+    fun cancelReminderNotification(context: Context, reminderId: Int) {
+        try {
+            NotificationManagerCompat.from(context).cancel(reminderId)
+        } catch (_: Exception) {
+            // Best effort.
         }
     }
 
@@ -50,11 +115,12 @@ object NotificationHelper {
         facilityName: String,
         fastingInstructions: String
     ) {
-        val intent = Intent(context, MainActivity::class.java).apply {
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            putExtra(EXTRA_DESTINATION, DEST_LAB_TESTS)
         }
         val pendingIntent = PendingIntent.getActivity(
-            context, 20000 + orderId, intent,
+            context, 20000 + orderId, launchIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -65,11 +131,12 @@ object NotificationHelper {
         }
 
         val notification = NotificationCompat.Builder(context, MedTrackApplication.LAB_ORDER_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("📋 Upcoming Lab Test Tomorrow: $testName")
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle("${context.getString(R.string.notification_lab_title)}: $testName")
             .setContentText(contentText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(contentText))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
@@ -77,7 +144,7 @@ object NotificationHelper {
         try {
             NotificationManagerCompat.from(context).notify(20000 + orderId, notification)
         } catch (e: SecurityException) {
-            // Permission not granted
+            // Notification permission not granted.
         }
     }
 }

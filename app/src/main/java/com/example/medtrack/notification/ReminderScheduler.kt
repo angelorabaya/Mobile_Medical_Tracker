@@ -5,6 +5,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import com.example.medtrack.data.entity.MedicineReminder
+import com.example.medtrack.util.ExactAlarmPermission
 import java.util.Calendar
 
 object ReminderScheduler {
@@ -124,27 +125,36 @@ object ReminderScheduler {
         }
 
         try {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.RTC_WAKEUP,
-                    finalTriggerTime,
-                    pendingIntent
-                )
+            if (ExactAlarmPermission.canScheduleExactAlarms(context)) {
+                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        finalTriggerTime,
+                        pendingIntent
+                    )
+                } else {
+                    alarmManager.setExact(
+                        AlarmManager.RTC_WAKEUP,
+                        finalTriggerTime,
+                        pendingIntent
+                    )
+                }
             } else {
-                alarmManager.setExact(
+                // Exact-alarm access not granted: fall back to a close inexact window.
+                alarmManager.setWindow(
                     AlarmManager.RTC_WAKEUP,
                     finalTriggerTime,
+                    5 * 60 * 1000L,
                     pendingIntent
                 )
             }
         } catch (e: SecurityException) {
-            try {
-                alarmManager.set(
-                    AlarmManager.RTC_WAKEUP,
-                    finalTriggerTime,
-                    pendingIntent
-                )
-            } catch (_: Exception) {}
+            alarmManager.setWindow(
+                AlarmManager.RTC_WAKEUP,
+                finalTriggerTime,
+                5 * 60 * 1000L,
+                pendingIntent
+            )
         }
     }
 

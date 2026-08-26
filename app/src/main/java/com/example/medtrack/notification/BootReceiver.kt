@@ -9,29 +9,45 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
+/**
+ * Re-schedules medicine and lab-test reminders after events that clear
+ * [android.app.AlarmManager] alarms, such as device boot, app update, time
+ * change, or timezone change.
+ */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            val db = MedTrackDatabase.getDatabase(context)
-            CoroutineScope(Dispatchers.IO).launch {
-                val reminders = db.medicineReminderDao().getEnabledReminders().first()
-                for (reminder in reminders) {
-                    val label = if (reminder.label.isNotBlank()) {
-                        reminder.label
-                    } else {
-                        val rx = db.prescriptionDao().getPrescriptionWithMedicationsByIdOnce(reminder.prescriptionId)
-                        rx?.displayTitle ?: "Medicine"
-                    }
-                    ReminderScheduler.scheduleReminder(
-                        context, reminder, label
-                    )
-                }
+        if (intent.action !in RESCHEDULE_ACTIONS) return
 
-                val pendingLabOrders = db.pendingLabOrderDao().getAllActiveReminderOrders()
-                for (order in pendingLabOrders) {
-                    ReminderScheduler.scheduleLabOrderReminder(context, order)
+        val db = MedTrackDatabase.getDatabase(context)
+        CoroutineScope(Dispatchers.IO).launch {
+            val reminders = db.medicineReminderDao().getEnabledReminders().first()
+            for (reminder in reminders) {
+                val label = if (reminder.label.isNotBlank()) {
+                    reminder.label
+                } else {
+                    val rx = db.prescriptionDao().getPrescriptionWithMedicationsByIdOnce(reminder.prescriptionId)
+                    rx?.displayTitle ?: "Medicine"
                 }
+                ReminderScheduler.scheduleReminder(
+                    context, reminder, label
+                )
+            }
+
+            val pendingLabOrders = db.pendingLabOrderDao().getAllActiveReminderOrders()
+            for (order in pendingLabOrders) {
+                ReminderScheduler.scheduleLabOrderReminder(context, order)
             }
         }
+    }
+
+    companion object {
+        val RESCHEDULE_ACTIONS = setOf(
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_LOCKED_BOOT_COMPLETED,
+            Intent.ACTION_MY_PACKAGE_REPLACED,
+            Intent.ACTION_TIME_CHANGED,
+            Intent.ACTION_TIMEZONE_CHANGED,
+            "android.intent.action.QUICKBOOT_POWERON"
+        )
     }
 }

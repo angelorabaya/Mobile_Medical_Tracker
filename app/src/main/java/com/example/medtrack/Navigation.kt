@@ -2,6 +2,7 @@ package com.example.medtrack
 
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -17,10 +18,31 @@ import com.example.medtrack.ui.prescription.AddPrescriptionScreen
 import com.example.medtrack.ui.prescription.PrescriptionDetailScreen
 import com.example.medtrack.ui.reminder.ReminderListScreen
 
+/** Top-level destinations a notification can deep-link the user to. */
+enum class DeepLinkTarget { NONE, REMINDERS, LAB_TESTS, PRESCRIPTION }
+
 @Composable
-fun MainNavigation() {
+fun MainNavigation(
+    deepLinkTarget: DeepLinkTarget = DeepLinkTarget.NONE,
+    deepLinkPrescriptionId: Int? = null
+) {
     val backStack = rememberNavBackStack(Home)
     val defaultModifier = Modifier.safeDrawingPadding()
+
+    // Route notification taps to the relevant screen (pushed on top of Home).
+    LaunchedEffect(deepLinkTarget, deepLinkPrescriptionId) {
+        when (deepLinkTarget) {
+            DeepLinkTarget.REMINDERS -> backStack.add(ReminderList)
+            DeepLinkTarget.LAB_TESTS -> backStack.add(LabTestList)
+            DeepLinkTarget.PRESCRIPTION -> {
+                backStack.add(PrescriptionList)
+                if (deepLinkPrescriptionId != null) {
+                    backStack.add(PrescriptionDetail(deepLinkPrescriptionId))
+                }
+            }
+            DeepLinkTarget.NONE -> Unit
+        }
+    }
 
     NavDisplay(
         backStack = backStack,

@@ -1,6 +1,5 @@
 package com.example.medtrack.ui.prescription
 
-import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -18,19 +17,19 @@ class PrescriptionDetailViewModel(
     private val app: MedTrackApplication,
     private val prescriptionId: Int
 ) : AndroidViewModel(app) {
-    private val db = app.database
+    private val container = app.container
 
-    val prescriptionWithMedications: StateFlow<PrescriptionWithMedications?> = db.prescriptionDao()
+    val prescriptionWithMedications: StateFlow<PrescriptionWithMedications?> = container.prescriptionRepository
         .getPrescriptionWithMedicationsById(prescriptionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val reminders: StateFlow<List<MedicineReminder>> = db.medicineReminderDao()
+    val reminders: StateFlow<List<MedicineReminder>> = container.reminderRepository
         .getRemindersByPrescription(prescriptionId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     init {
         viewModelScope.launch {
-            val current = db.prescriptionDao().getPrescriptionWithMedicationsByIdOnce(prescriptionId)
+            val current = container.prescriptionRepository.getPrescriptionWithMedicationsByIdOnce(prescriptionId)
             current?.medications?.forEach { med ->
                 var updatedMed = med
                 if (med.medicationName.contains("Atorvasta", ignoreCase = true)) {
@@ -50,7 +49,7 @@ class PrescriptionDetailViewModel(
                     )
                 }
                 if (updatedMed != med) {
-                    db.prescriptionDao().updateMedication(updatedMed)
+                    container.prescriptionRepository.updateMedication(updatedMed)
                 }
             }
         }
@@ -58,14 +57,14 @@ class PrescriptionDetailViewModel(
 
     fun toggleStatus() {
         viewModelScope.launch {
-            val current = db.prescriptionDao().getPrescriptionByIdOnce(prescriptionId) ?: return@launch
-            db.prescriptionDao().update(current.copy(isActive = !current.isActive))
+            val current = container.prescriptionRepository.getPrescriptionByIdOnce(prescriptionId) ?: return@launch
+            container.prescriptionRepository.update(current.copy(isActive = !current.isActive))
         }
     }
 
     fun updateMedication(medication: PrescriptionMedication) {
         viewModelScope.launch {
-            db.prescriptionDao().updateMedication(medication)
+            container.prescriptionRepository.updateMedication(medication)
         }
     }
 
@@ -85,13 +84,13 @@ class PrescriptionDetailViewModel(
                 duration = duration,
                 instructions = instructions
             )
-            db.prescriptionDao().insertMedication(newMed)
+            container.prescriptionRepository.insertMedication(newMed)
         }
     }
 
     fun deleteMedication(medication: PrescriptionMedication) {
         viewModelScope.launch {
-            db.prescriptionDao().deleteMedication(medication)
+            container.prescriptionRepository.deleteMedication(medication)
         }
     }
 
@@ -102,8 +101,8 @@ class PrescriptionDetailViewModel(
         notes: String
     ) {
         viewModelScope.launch {
-            val current = db.prescriptionDao().getPrescriptionByIdOnce(prescriptionId) ?: return@launch
-            db.prescriptionDao().update(
+            val current = container.prescriptionRepository.getPrescriptionByIdOnce(prescriptionId) ?: return@launch
+            container.prescriptionRepository.update(
                 current.copy(
                     title = title,
                     doctorName = doctorName,
@@ -116,14 +115,14 @@ class PrescriptionDetailViewModel(
 
     fun updatePrescriptionImage(newImageUri: String?) {
         viewModelScope.launch {
-            val current = db.prescriptionDao().getPrescriptionByIdOnce(prescriptionId) ?: return@launch
-            db.prescriptionDao().update(current.copy(imageUri = newImageUri))
+            val current = container.prescriptionRepository.getPrescriptionByIdOnce(prescriptionId) ?: return@launch
+            container.prescriptionRepository.update(current.copy(imageUri = newImageUri))
         }
     }
 
     fun addReminder(time: String, drugLabel: String = "") {
         viewModelScope.launch {
-            val current = db.prescriptionDao().getPrescriptionWithMedicationsByIdOnce(prescriptionId) ?: return@launch
+            val current = container.prescriptionRepository.getPrescriptionWithMedicationsByIdOnce(prescriptionId) ?: return@launch
             val reminderLabel = if (drugLabel.isNotBlank()) drugLabel else current.displayTitle
             val reminder = MedicineReminder(
                 prescriptionId = prescriptionId,
@@ -131,7 +130,7 @@ class PrescriptionDetailViewModel(
                 isEnabled = true,
                 label = reminderLabel
             )
-            val id = db.medicineReminderDao().insert(reminder)
+            val id = container.reminderRepository.insert(reminder)
             val saved = reminder.copy(id = id.toInt())
             ReminderScheduler.scheduleReminder(app, saved, reminderLabel)
         }
@@ -140,8 +139,8 @@ class PrescriptionDetailViewModel(
     fun toggleReminder(reminder: MedicineReminder) {
         viewModelScope.launch {
             val updated = reminder.copy(isEnabled = !reminder.isEnabled)
-            db.medicineReminderDao().update(updated)
-            val current = db.prescriptionDao().getPrescriptionWithMedicationsByIdOnce(prescriptionId)
+            container.reminderRepository.update(updated)
+            val current = container.prescriptionRepository.getPrescriptionWithMedicationsByIdOnce(prescriptionId)
             val medName = if (reminder.label.isNotBlank()) reminder.label else (current?.displayTitle ?: "Medicine")
             if (updated.isEnabled) {
                 ReminderScheduler.scheduleReminder(app, updated, medName)
@@ -153,7 +152,7 @@ class PrescriptionDetailViewModel(
 
     fun deleteReminder(reminder: MedicineReminder) {
         viewModelScope.launch {
-            db.medicineReminderDao().delete(reminder)
+            container.reminderRepository.delete(reminder)
             ReminderScheduler.cancelReminder(app, reminder.id)
         }
     }

@@ -39,7 +39,6 @@ fun ImageAttachmentPicker(
     val context = LocalContext.current
     var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
     var tempCameraFile by remember { mutableStateOf<File?>(null) }
-    var showFullImageDialog by remember { mutableStateOf(false) }
 
     // Camera launcher
     val cameraLauncher = rememberLauncherForActivityResult(
@@ -88,6 +87,27 @@ fun ImageAttachmentPicker(
         }
     }
 
+    StatelessImageAttachmentPicker(
+        imageUri = imageUri,
+        onClearImage = { onImageSelected(null) },
+        onTakePhoto = onTakePhotoClick,
+        onPickFromGallery = { galleryLauncher.launch("image/*") },
+        modifier = modifier,
+        label = label
+    )
+}
+
+@Composable
+fun StatelessImageAttachmentPicker(
+    imageUri: String?,
+    onClearImage: () -> Unit,
+    onTakePhoto: () -> Unit,
+    onPickFromGallery: () -> Unit,
+    modifier: Modifier = Modifier,
+    label: String = "Attachment / Photo"
+) {
+    var showFullImageDialog by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -126,7 +146,7 @@ fun ImageAttachmentPicker(
                     horizontalArrangement = Arrangement.End
                 ) {
                     IconButton(
-                        onClick = { onImageSelected(null) },
+                        onClick = onClearImage,
                         modifier = Modifier
                             .size(36.dp)
                             .background(Color.Black.copy(alpha = 0.6f), CircleShape)
@@ -174,7 +194,7 @@ fun ImageAttachmentPicker(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 OutlinedButton(
-                    onClick = { onTakePhotoClick() },
+                    onClick = onTakePhoto,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(12.dp)
@@ -185,7 +205,7 @@ fun ImageAttachmentPicker(
                 }
 
                 OutlinedButton(
-                    onClick = { galleryLauncher.launch("image/*") },
+                    onClick = onPickFromGallery,
                     modifier = Modifier.weight(1f),
                     shape = RoundedCornerShape(12.dp),
                     contentPadding = PaddingValues(12.dp)

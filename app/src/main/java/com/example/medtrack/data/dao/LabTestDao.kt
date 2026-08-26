@@ -29,6 +29,10 @@ interface LabTestDao {
     @Query("SELECT * FROM lab_tests WHERE id = :id")
     suspend fun getLabTestWithItemsByIdOnce(id: Int): LabTestWithItems?
 
+    @Transaction
+    @Query("SELECT * FROM lab_tests")
+    suspend fun getAllLabTestsWithItemsOnce(): List<LabTestWithItems>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(labTest: LabTest): Long
 

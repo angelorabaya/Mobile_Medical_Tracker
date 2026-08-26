@@ -33,6 +33,10 @@ interface PrescriptionDao {
     @Query("SELECT * FROM prescriptions WHERE id = :id")
     suspend fun getPrescriptionWithMedicationsByIdOnce(id: Int): PrescriptionWithMedications?
 
+    @Transaction
+    @Query("SELECT * FROM prescriptions")
+    suspend fun getAllPrescriptionsWithMedicationsOnce(): List<PrescriptionWithMedications>
+
     @Query("SELECT * FROM prescriptions WHERE patientId = :patientId AND isActive = 1 ORDER BY datePrescribed DESC")
     fun getActivePrescriptions(patientId: Int): Flow<List<Prescription>>
 

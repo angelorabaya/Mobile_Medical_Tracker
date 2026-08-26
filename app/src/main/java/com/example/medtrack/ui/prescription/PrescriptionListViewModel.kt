@@ -6,23 +6,25 @@ import androidx.lifecycle.viewModelScope
 import com.example.medtrack.MedTrackApplication
 import com.example.medtrack.data.entity.Prescription
 import com.example.medtrack.data.entity.PrescriptionWithMedications
+import com.example.medtrack.notification.ReminderScheduler
 import com.example.medtrack.util.DateUtils
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 
 class PrescriptionListViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = (application as MedTrackApplication).database
+    private val app = application as MedTrackApplication
+    private val container = app.container
 
     val showActiveOnly = MutableStateFlow(false)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val prescriptionsWithMedications: StateFlow<List<PrescriptionWithMedications>> = db.patientDao().getPatient()
+    val prescriptionsWithMedications: StateFlow<List<PrescriptionWithMedications>> = container.patientRepository.getPatient()
         .flatMapLatest { patient ->
             if (patient != null) {
                 showActiveOnly.flatMapLatest { activeOnly ->
-                    if (activeOnly) db.prescriptionDao().getActivePrescriptionsWithMedications(patient.id)
-                    else db.prescriptionDao().getPrescriptionsWithMedications(patient.id)
+                    if (activeOnly) container.prescriptionRepository.getActivePrescriptionsWithMedications(patient.id)
+                    else container.prescriptionRepository.getPrescriptionsWithMedications(patient.id)
                 }
             } else flowOf(emptyList())
         }
@@ -45,13 +47,20 @@ class PrescriptionListViewModel(application: Application) : AndroidViewModel(app
 
     fun togglePrescriptionStatus(prescription: Prescription) {
         viewModelScope.launch {
-            db.prescriptionDao().update(prescription.copy(isActive = !prescription.isActive))
+            container.prescriptionRepository.update(prescription.copy(isActive = !prescription.isActive))
         }
     }
 
     fun deletePrescription(prescription: Prescription) {
         viewModelScope.launch {
-            db.prescriptionDao().delete(prescription)
+            // Cancel any scheduled alarms for this prescription's reminders
+            // before the FK cascade removes them.
+            container.reminderRepository.getRemindersByPrescription(prescription.id)
+                .first()
+                .forEach { reminder ->
+                    ReminderScheduler.cancelReminder(app, reminder.id)
+                }
+            container.prescriptionRepository.delete(prescription)
         }
     }
 }

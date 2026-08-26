@@ -64,28 +64,30 @@
 ```
 com.example.medtrack
 ├── data
-│   ├── dao          # Room DAOs (LabTestDao, PrescriptionDao, PatientDao, etc.)
-│   ├── entity       # SQLite Entities & 1-to-many Relation Data Classes
-│   └── DataRepository.kt
-├── notification     # AlarmManager, ReminderReceiver, BootReceiver, NotificationHelper
+│   ├── dao              # Room DAOs (LabTestDao, PrescriptionDao, PatientDao, etc.)
+│   ├── entity           # SQLite Entities & 1-to-many Relation Data Classes
+│   ├── repository       # Repositories wrapping DAOs (adds image cleanup, etc.)
+│   └── AppContainer.kt  # Manual DI container exposing repositories to ViewModels
+├── notification     # AlarmManager, ReminderReceiver, BootReceiver, NotificationHelper, ReminderActionReceiver
 ├── theme            # Material 3 Color Schemes, Typography, Shapes
 ├── ui
 │   ├── components   # Reusable UI widgets (Badges, Zoom Dialog, Dosage Schedule)
 │   ├── home         # Health Dashboard & Patient Hero Card
 │   ├── labtest      # List, Add, Detail, and Test Type Maintenance Screens
 │   ├── prescription # List, Add, and Detail Prescription Screens
-│   ├── profile      # Patient Profile & Registration Screens
+│   ├── profile      # Patient Profile, Registration, Data Export/Import & App Lock
 │   └── reminder     # Medicine Alarm Management
-└── util             # LabResultEvaluator, FrequencyHelper, ImageUtils
+└── util             # LabResultEvaluator, FrequencyHelper, ImageUtils, DataExporter, Permissions, AppLockManager, DbKeyManager
 ```
 
 - **Language**: Kotlin 2.0+
 - **UI Framework**: Jetpack Compose with Material 3
-- **Architecture Pattern**: MVVM (Model-View-ViewModel) + Clean Architecture with Repository pattern
-- **Database**: Room Database (SQLite, 100% offline, local-first privacy)
+- **Architecture Pattern**: MVVM (Model-View-ViewModel) with a real Repository layer, wired through a lightweight `AppContainer` (manual DI; Hilt is the planned upgrade path once the project pins a Kotlin toolchain compatible with the Hilt KSP processor).
+- **Database**: Room Database (SQLite, 100% offline, local-first privacy), **encrypted at rest with SQLCipher**
 - **Async & Reactive**: Kotlin Coroutines & `StateFlow` / `SharedFlow`
 - **Image Loading**: Coil Compose
-- **System Alarms**: Android `AlarmManager` with `USE_EXACT_ALARM` & `POST_NOTIFICATIONS`
+- **System Alarms**: Android `AlarmManager` with `SCHEDULE_EXACT_ALARM` (runtime grant, with inexact fallback) & `POST_NOTIFICATIONS` (runtime request)
+- **Security**: SQLCipher encryption-at-rest, optional biometric app lock, backups disabled
 
 ---
 
@@ -125,11 +127,12 @@ com.example.medtrack
 
 ---
 
-## 🧪 Unit Testing
+## 🧪 Testing
 
-VitalsIQ includes comprehensive unit tests for core business logic, such as the clinical reference range evaluator and comparative panel trend analytics:
+VitalsIQ includes unit tests for core business logic (clinical reference range evaluator, comparative panel trend analytics, date helpers, frequency schedule parsing) plus instrumented Room DAO tests:
 ```bash
-./gradlew testDebugUnitTest --tests "com.example.medtrack.util.LabResultEvaluatorTest"
+./gradlew testDebugUnitTest
+./gradlew connectedDebugAndroidTest   # requires a connected device/emulator
 ```
 
 Verified test cases include:
@@ -138,13 +141,21 @@ Verified test cases include:
 - Lower limit thresholds (`> Limit`, `>= Limit`)
 - Qualitative text results (*Negative*, *Clear*, *Non-reactive* vs *Positive*, *Abnormal*)
 - Decimal, integer, and unit-suffixed clinical inputs
+- `FrequencyHelper` schedule formatting/parsing (numeric + legacy text)
+- Room DAO CRUD and FK cascade behavior (lab test items, prescription medications, reminders)
 
 ---
 
 ## 🔒 Privacy & Security
 
-- **100% Local-First**: All patient profiles, prescriptions, lab results, and document photos are stored strictly on the user's physical device inside protected SQLite database storage and app-private directory.
+- **100% Local-First**: All patient profiles, prescriptions, lab results, and document photos are stored strictly on the user's physical device.
+- **Encryption at Rest**: The Room database is encrypted with SQLCipher using a randomly generated 256-bit key.
+- **No Cloud Backup**: `allowBackup=false` prevents health records from being uploaded to cloud backup or pulled via `adb`; Room schema exports and pre-migration DB backups are kept app-local.
+- **Optional App Lock**: Biometric or device-credential authentication can be enabled from the profile screen to protect the app.
+- **Exact Alarm Permission**: Uses the non-restricted `SCHEDULE_EXACT_ALARM` flow with a graceful inexact-alarm fallback when access is not granted.
+- **Demo Data**: The sample patient/prescription seeding only runs in DEBUG builds; no PII ships in production.
 - **No Cloud Tracking**: No external telemetry, tracking, or mandatory internet connectivity required.
+- **Data Portability**: Full JSON export/import (share a backup with a doctor or restore on a new device).
 
 ---
 

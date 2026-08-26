@@ -1,8 +1,5 @@
-package com.example.medtrack.ui.main
+package com.example.medtrack.data.entity
 
-import com.example.medtrack.data.entity.LabTest
-import com.example.medtrack.data.entity.LabTestItem
-import com.example.medtrack.data.entity.LabTestWithItems
 import org.junit.Assert.assertEquals
 import org.junit.Test
 

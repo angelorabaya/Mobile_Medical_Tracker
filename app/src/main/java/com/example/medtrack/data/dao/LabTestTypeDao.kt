@@ -29,4 +29,7 @@ interface LabTestTypeDao {
 
     @Query("DELETE FROM lab_test_types WHERE id = :id")
     suspend fun deleteById(id: Int)
+
+    @Query("DELETE FROM lab_test_types")
+    suspend fun deleteAll()
 }

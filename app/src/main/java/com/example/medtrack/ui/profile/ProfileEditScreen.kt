@@ -1,8 +1,10 @@
 package com.example.medtrack.ui.profile
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -26,8 +28,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.medtrack.R
+import com.example.medtrack.util.AppLockManager
 import com.example.medtrack.util.ImageUtils
 import java.io.File
 
@@ -82,6 +87,41 @@ fun ProfileEditScreen(
         if (uri != null) {
             val savedPath = ImageUtils.saveImageToInternalStorage(context, uri)
             viewModel.photoUri = savedPath ?: uri.toString()
+        }
+    }
+
+    var exportPath by remember { mutableStateOf<String?>(null) }
+    var showImportConfirm by remember { mutableStateOf(false) }
+
+    // Export: share the generated JSON backup file.
+    LaunchedEffect(exportPath) {
+        val path = exportPath ?: return@LaunchedEffect
+        val file = File(path)
+        if (file.exists()) {
+            val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                type = "application/json"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                putExtra(Intent.EXTRA_SUBJECT, context.getString(R.string.export_shared_label))
+            }
+            context.startActivity(Intent.createChooser(shareIntent, null))
+        }
+        exportPath = null
+    }
+
+    // Import: pick a JSON backup file to restore.
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            viewModel.importData(uri) { ok ->
+                Toast.makeText(
+                    context,
+                    if (ok) "Import successful" else "Import failed",
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
         }
     }
 
@@ -376,6 +416,104 @@ fun ProfileEditScreen(
                     }
                 }
 
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            "App Lock",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        var biometricEnabled by remember { mutableStateOf(AppLockManager.isEnabled(context)) }
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    "Require biometric or device lock to open the app",
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                                Text(
+                                    "Protects your health records if your device is lost or shared.",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = biometricEnabled,
+                                onCheckedChange = { enabled ->
+                                    if (enabled && !AppLockManager.isAvailable(context)) {
+                                        Toast.makeText(
+                                            context,
+                                            "Biometric / device lock not available on this device",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    } else {
+                                        biometricEnabled = enabled
+                                        AppLockManager.setEnabled(context, enabled)
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Card(
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            context.getString(R.string.export_title),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Text(
+                            "Export your full health record as a JSON backup to share with a doctor or store offline. Importing restores from a backup and replaces all current data.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = { viewModel.exportData { exportPath = it } },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(10.dp)
+                            ) {
+                                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Export Data")
+                            }
+                            Button(
+                                onClick = { showImportConfirm = true },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp),
+                                contentPadding = PaddingValues(10.dp)
+                            ) {
+                                Icon(Icons.Default.FileUpload, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text("Import Data")
+                            }
+                        }
+                    }
+                }
+
                 Button(
                     onClick = { viewModel.updatePatient(onBack) },
                     modifier = Modifier
@@ -388,6 +526,23 @@ fun ProfileEditScreen(
                     Text("Save Changes", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 }
             }
+        }
+
+        if (showImportConfirm) {
+            AlertDialog(
+                onDismissRequest = { showImportConfirm = false },
+                title = { Text("Import backup?") },
+                text = { Text("This will replace all current health data with the backup contents. This cannot be undone.") },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showImportConfirm = false
+                        importLauncher.launch(arrayOf("application/json", "text/*", "application/octet-stream"))
+                    }) { Text("Continue") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showImportConfirm = false }) { Text("Cancel") }
+                }
+            )
         }
     }
 }

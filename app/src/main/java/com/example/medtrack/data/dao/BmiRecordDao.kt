@@ -15,6 +15,9 @@ interface BmiRecordDao {
     @Query("SELECT * FROM bmi_records WHERE patientId = :patientId ORDER BY calculatedAt DESC LIMIT 1")
     suspend fun getLatestBmiRecordOnce(patientId: Int): BmiRecord?
 
+    @Query("SELECT * FROM bmi_records")
+    suspend fun getAllBmiRecordsOnce(): List<BmiRecord>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(record: BmiRecord): Long
 

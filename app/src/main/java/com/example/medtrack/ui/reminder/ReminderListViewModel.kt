@@ -16,16 +16,16 @@ data class ReminderWithMedName(
 
 class ReminderListViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application as MedTrackApplication
-    private val db = app.database
+    private val container = app.container
 
-    val remindersWithMeds: StateFlow<List<ReminderWithMedName>> = db.medicineReminderDao()
+    val remindersWithMeds: StateFlow<List<ReminderWithMedName>> = container.reminderRepository
         .getAllReminders()
         .map { reminders ->
             reminders.mapNotNull { reminder ->
                 val medName = if (reminder.label.isNotBlank()) {
                     reminder.label
                 } else {
-                    val rxWithMeds = db.prescriptionDao().getPrescriptionWithMedicationsByIdOnce(reminder.prescriptionId)
+                    val rxWithMeds = container.prescriptionRepository.getPrescriptionWithMedicationsByIdOnce(reminder.prescriptionId)
                     rxWithMeds?.displayTitle ?: "Prescription"
                 }
                 ReminderWithMedName(reminder, medName)
@@ -36,7 +36,7 @@ class ReminderListViewModel(application: Application) : AndroidViewModel(applica
     fun toggleReminder(reminder: MedicineReminder, medicationName: String) {
         viewModelScope.launch {
             val updated = reminder.copy(isEnabled = !reminder.isEnabled)
-            db.medicineReminderDao().update(updated)
+            container.reminderRepository.update(updated)
             if (updated.isEnabled) {
                 ReminderScheduler.scheduleReminder(app, updated, medicationName)
             } else {
@@ -47,7 +47,7 @@ class ReminderListViewModel(application: Application) : AndroidViewModel(applica
 
     fun deleteReminder(reminder: MedicineReminder) {
         viewModelScope.launch {
-            db.medicineReminderDao().delete(reminder)
+            container.reminderRepository.delete(reminder)
             ReminderScheduler.cancelReminder(app, reminder.id)
         }
     }

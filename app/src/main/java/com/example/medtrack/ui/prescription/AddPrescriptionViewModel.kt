@@ -30,7 +30,7 @@ data class MedicationInput(
 }
 
 class AddPrescriptionViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = (application as MedTrackApplication).database
+    private val container = (application as MedTrackApplication).container
 
     var title by mutableStateOf("")
     var doctorName by mutableStateOf("")
@@ -119,7 +119,7 @@ class AddPrescriptionViewModel(application: Application) : AndroidViewModel(appl
         errorMessage = null
 
         viewModelScope.launch {
-            val patient = db.patientDao().getPatientOnce() ?: return@launch
+            val patient = container.patientRepository.getPatientOnce() ?: return@launch
 
             val prescription = Prescription(
                 patientId = patient.id,
@@ -141,7 +141,7 @@ class AddPrescriptionViewModel(application: Application) : AndroidViewModel(appl
                 )
             }
 
-            db.prescriptionDao().insertPrescriptionWithMedications(prescription, prescriptionMeds)
+            container.prescriptionRepository.insertPrescriptionWithMedications(prescription, prescriptionMeds)
             resetState()
             onComplete()
         }

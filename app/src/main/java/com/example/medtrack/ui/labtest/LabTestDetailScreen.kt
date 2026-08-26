@@ -1,5 +1,10 @@
 package com.example.medtrack.ui.labtest
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,9 +24,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
@@ -29,8 +36,10 @@ import com.example.medtrack.data.entity.LabTestItem
 import com.example.medtrack.data.entity.LabTestType
 import com.example.medtrack.ui.components.CategoryBadge
 import com.example.medtrack.ui.components.ImageAttachmentPicker
+import com.example.medtrack.ui.components.StatelessImageAttachmentPicker
 import com.example.medtrack.ui.components.ZoomableImageDialog
 import com.example.medtrack.ui.labtest.components.ManageLabTestTypesDialog
+import com.example.medtrack.util.ImageUtils
 import com.example.medtrack.util.LabResultEvaluator
 import com.example.medtrack.util.LabResultStatus
 import java.io.File
@@ -41,7 +50,10 @@ fun LabTestDetailScreen(
     testId: Int,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
-    viewModel: LabTestDetailViewModel = viewModel(factory = LabTestDetailViewModel.factory(testId))
+    viewModel: LabTestDetailViewModel = viewModel(
+        key = "LabTestDetail_$testId",
+        factory = LabTestDetailViewModel.factory(testId)
+    )
 ) {
     val labTestWithItems by viewModel.labTestWithItems.collectAsStateWithLifecycle()
     val testTypes by viewModel.testTypes.collectAsStateWithLifecycle()
@@ -54,6 +66,60 @@ fun LabTestDetailScreen(
     var showManageTypesDialog by remember { mutableStateOf(false) }
     var allExpanded by remember { mutableStateOf(false) }
     var expandAllTrigger by remember { mutableStateOf(0) }
+
+    val context = LocalContext.current
+    var tempCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var tempCameraFile by remember { mutableStateOf<File?>(null) }
+
+    var photoTargetType by remember { mutableStateOf<String?>(null) } // "parent"
+
+    val handleImageSelected = { path: String? ->
+        if (photoTargetType == "parent") {
+            viewModel.updateLabTestImage(path)
+        }
+        photoTargetType = null
+    }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && tempCameraFile != null) {
+            val savedPath = ImageUtils.saveImageToInternalStorage(context, Uri.fromFile(tempCameraFile))
+            handleImageSelected(savedPath ?: tempCameraFile?.absolutePath)
+        }
+    }
+
+    val launchCamera = {
+        val (file, uri) = ImageUtils.createImageFileUri(context)
+        tempCameraFile = file
+        tempCameraUri = uri
+        cameraLauncher.launch(uri)
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            launchCamera()
+        }
+    }
+
+    val onTakePhotoClick = {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            launchCamera()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            val savedPath = ImageUtils.saveImageToInternalStorage(context, uri)
+            handleImageSelected(savedPath ?: uri.toString())
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -430,9 +496,17 @@ fun LabTestDetailScreen(
                                 }
                             }
                         } else {
-                            ImageAttachmentPicker(
+                            StatelessImageAttachmentPicker(
                                 imageUri = labTest.imageUri,
-                                onImageSelected = { newUri -> viewModel.updateLabTestImage(newUri) },
+                                onClearImage = { viewModel.updateLabTestImage(null) },
+                                onTakePhoto = {
+                                    photoTargetType = "parent"
+                                    onTakePhotoClick()
+                                },
+                                onPickFromGallery = {
+                                    photoTargetType = "parent"
+                                    galleryLauncher.launch("image/*")
+                                },
                                 label = "Attach lab report scan or test result photo"
                             )
                         }
@@ -1260,6 +1334,7 @@ private fun LabTestItemDetailCard(
                             }
                         }
                     }
+
                 }
             }
         }

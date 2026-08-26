@@ -7,7 +7,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.CreationExtras
 import com.example.medtrack.MedTrackApplication
-import com.example.medtrack.data.entity.LabTest
 import com.example.medtrack.data.entity.LabTestItem
 import com.example.medtrack.data.entity.LabTestType
 import com.example.medtrack.data.entity.LabTestWithItems
@@ -18,7 +17,7 @@ class LabTestDetailViewModel(
     application: Application,
     private val testId: Int
 ) : AndroidViewModel(application) {
-    private val db = (application as MedTrackApplication).database
+    private val container = (application as MedTrackApplication).container
 
     val categoryOptions = listOf(
         "Blood Work",
@@ -29,11 +28,11 @@ class LabTestDetailViewModel(
         "Other"
     )
 
-    val labTestWithItems: StateFlow<LabTestWithItems?> = db.labTestDao()
+    val labTestWithItems: StateFlow<LabTestWithItems?> = container.labTestRepository
         .getLabTestWithItemsById(testId)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
-    val testTypes: StateFlow<List<LabTestType>> = db.labTestTypeDao()
+    val testTypes: StateFlow<List<LabTestType>> = container.labTestTypeRepository
         .getAllTestTypes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -62,22 +61,22 @@ class LabTestDetailViewModel(
                 LabTestType(name = "Serum Electrolytes (Na, K, Cl)", defaultCategory = "Blood Work", defaultNormalRange = "Na: 135-145, K: 3.5-5.0, Cl: 96-106 mEq/L", isDefault = true)
             )
 
-            val existing = db.labTestTypeDao().getAllTestTypesOnce()
+            val existing = container.labTestTypeRepository.getAllTestTypesOnce()
             if (existing.isEmpty()) {
-                db.labTestTypeDao().insertAll(defaults)
+                container.labTestTypeRepository.insertAll(defaults)
             } else {
                 val oldCombined = existing.filter {
                     it.name.contains("Lipid Profile (", ignoreCase = true) || it.name.equals("Lipid Profile", ignoreCase = true)
                 }
                 for (old in oldCombined) {
-                    db.labTestTypeDao().delete(old)
+                    container.labTestTypeRepository.delete(old)
                 }
                 val lipidItems = defaults.filter { it.name.startsWith("Lipid Profile -") }
                 val toInsert = lipidItems.filter { item ->
                     existing.none { it.name.equals(item.name, ignoreCase = true) }
                 }
                 if (toInsert.isNotEmpty()) {
-                    db.labTestTypeDao().insertAll(toInsert)
+                    container.labTestTypeRepository.insertAll(toInsert)
                 }
             }
         }
@@ -92,7 +91,7 @@ class LabTestDetailViewModel(
     ) {
         viewModelScope.launch {
             val current = labTestWithItems.value?.labTest ?: return@launch
-            db.labTestDao().update(
+            container.labTestRepository.update(
                 current.copy(
                     title = title,
                     testDate = testDate,
@@ -107,7 +106,7 @@ class LabTestDetailViewModel(
     fun updateLabTestImage(imageUri: String?) {
         viewModelScope.launch {
             val current = labTestWithItems.value?.labTest ?: return@launch
-            db.labTestDao().update(current.copy(imageUri = imageUri))
+            container.labTestRepository.update(current.copy(imageUri = imageUri))
         }
     }
 
@@ -127,26 +126,26 @@ class LabTestDetailViewModel(
                 normalRange = normalRange.trim(),
                 notes = notes.trim()
             )
-            db.labTestDao().insertItem(item)
+            container.labTestRepository.insertItem(item)
         }
     }
 
     fun updateLabTestItem(item: LabTestItem) {
         viewModelScope.launch {
-            db.labTestDao().updateItem(item)
+            container.labTestRepository.updateItem(item)
         }
     }
 
     fun deleteLabTestItem(item: LabTestItem) {
         viewModelScope.launch {
-            db.labTestDao().deleteItem(item)
+            container.labTestRepository.deleteItem(item)
         }
     }
 
     fun deleteLabTest(onComplete: () -> Unit) {
         viewModelScope.launch {
             val current = labTestWithItems.value?.labTest ?: return@launch
-            db.labTestDao().delete(current)
+            container.labTestRepository.delete(current)
             onComplete()
         }
     }
@@ -160,7 +159,7 @@ class LabTestDetailViewModel(
                 defaultNormalRange = defaultRange.trim(),
                 isDefault = false
             )
-            val id = db.labTestTypeDao().insert(newType)
+            val id = container.labTestTypeRepository.insert(newType)
             val createdType = newType.copy(id = id.toInt())
             onComplete?.invoke(createdType)
         }
@@ -169,14 +168,14 @@ class LabTestDetailViewModel(
     fun updateTestType(type: LabTestType, onComplete: (() -> Unit)? = null) {
         if (type.name.isBlank()) return
         viewModelScope.launch {
-            db.labTestTypeDao().update(type.copy(name = type.name.trim(), defaultNormalRange = type.defaultNormalRange.trim()))
+            container.labTestTypeRepository.update(type.copy(name = type.name.trim(), defaultNormalRange = type.defaultNormalRange.trim()))
             onComplete?.invoke()
         }
     }
 
     fun deleteTestType(type: LabTestType, onComplete: (() -> Unit)? = null) {
         viewModelScope.launch {
-            db.labTestTypeDao().delete(type)
+            container.labTestTypeRepository.delete(type)
             onComplete?.invoke()
         }
     }

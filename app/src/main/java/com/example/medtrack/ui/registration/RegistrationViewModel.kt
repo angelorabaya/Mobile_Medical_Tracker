@@ -11,7 +11,7 @@ import com.example.medtrack.data.entity.Patient
 import kotlinx.coroutines.launch
 
 class RegistrationViewModel(application: Application) : AndroidViewModel(application) {
-    private val db = (application as MedTrackApplication).database
+    private val container = (application as MedTrackApplication).container
 
     var fullName by mutableStateOf("")
     var dateOfBirth by mutableStateOf("")
@@ -32,7 +32,7 @@ class RegistrationViewModel(application: Application) : AndroidViewModel(applica
         }
         errorMessage = null
         viewModelScope.launch {
-            db.patientDao().insert(
+            container.patientRepository.insert(
                 Patient(
                     fullName = fullName.trim(),
                     dateOfBirth = dateOfBirth.trim(),
